@@ -1,0 +1,4336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coach · AI Recruiting, Remembered</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FBFAF7;
+      --bg-sunk: #F5F3EE;
+      --paper: #FFFFFF;
+      --ink: #1A2420;
+      --ink-soft: #4A5550;
+      --ink-mute: #8A9590;
+      --forest: #0F3D2E;
+      --sage: #4A7C59;
+      --mint: #E8EDE4;
+      --line: rgba(15, 61, 46, 0.12);
+      --line-soft: rgba(15, 61, 46, 0.06);
+      --danger: #B85C50;
+      --warn-bg: #FFF6E8;
+      --warn-border: #E8D6A8;
+      --warn-text: #5C4820;
+    }
+    html, body, #root { background: var(--bg); min-height: 100vh; margin: 0; }
+    body { font-family: 'Geist', system-ui, sans-serif; color: var(--ink); }
+    .font-display { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
+    .font-body    { font-family: 'Geist', system-ui, sans-serif; }
+    .font-mono    { font-family: 'Geist Mono', ui-monospace, monospace; }
+    .eyebrow      { font-family: 'Geist', sans-serif; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mute); font-weight: 500; }
+    textarea, input, select { font-family: 'Geist', system-ui, sans-serif; }
+    textarea:focus, input:focus, select:focus { outline: none; border-color: var(--forest) !important; }
+    .chat-scroll::-webkit-scrollbar { width: 6px; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .dots span { display: inline-block; width: 4px; height: 4px; margin: 0 1px; border-radius: 50%; background: var(--sage); animation: dot 1.2s infinite ease-in-out; }
+    .dots span:nth-child(2) { animation-delay: 0.15s; }
+    .dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes dot { 0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
+    .loader { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; background: var(--bg); z-index: 9999; }
+    .loader.visible { display: flex; }
+    .loader-inner { text-align: center; color: var(--ink-soft); font-size: 13px; }
+    .loader-spinner { width: 24px; height: 24px; border: 2px solid var(--line); border-top-color: var(--forest); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div class="loader visible" id="init-loader">
+    <div class="loader-inner">
+      <div class="loader-spinner"></div>
+      Loading Coach…
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18.3.1",
+      "react/": "https://esm.sh/react@18.3.1/",
+      "react-dom": "https://esm.sh/react-dom@18.3.1?deps=react@18.3.1",
+      "react-dom/": "https://esm.sh/react-dom@18.3.1&deps=react@18.3.1/",
+      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1",
+      "recharts": "https://esm.sh/recharts@2.13.3?deps=react@18.3.1,react-dom@18.3.1",
+      "mammoth": "https://esm.sh/mammoth@1.8.0",
+      "lucide-react": "https://esm.sh/lucide-react@0.454.0?deps=react@18.3.1",
+      "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+    }
+  }
+  </script>
+
+  <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+
+  <script type="text/babel" data-type="module" data-presets="react">
+    import React, { useState, useEffect, useRef } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { createClient } from '@supabase/supabase-js';
+
+    // ═══════════════════════════════════════════════════════════
+    // Supabase client
+    // ═══════════════════════════════════════════════════════════
+    const SUPABASE_URL = 'https://fqbpcbnmztawworkplzx.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_drYUkH6cP5FwYjfEO_b0wA_bJr3pZbp';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentUserId = null;
+    let dataCache = {};
+    const saveTimers = {};
+
+import * as mammoth from 'mammoth';
+import {
+  Check, Send, User, FileText, MessageSquare, BarChart3, X,
+  Sparkles, ArrowRight, Loader2, Upload, Trash2, FileUp,
+  Star, Plus, RefreshCw, AlertCircle, Image as ImageIcon,
+  Paperclip, Download, Edit3, Undo2,
+} from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+} from 'recharts';
+
+// ───────────────────────────────────────────────────────────────
+// Constants
+// ───────────────────────────────────────────────────────────────
+const MODEL = 'claude-sonnet-4-20250514';
+
+const STORAGE_KEYS = {
+  profile: 'coach:profile',
+  conversations: 'coach:conversations',
+  progress: 'coach:progress',
+  rubric: 'coach:rubric',
+  resumes: 'coach:resumes',
+  settings: 'coach:settings',
+};
+
+const MODULES = [
+  { id: 'onboarding', label: 'Onboarding',     icon: User },
+  { id: 'resume',     label: 'Resume',         icon: FileText },
+  { id: 'interview',  label: 'Mock Interview', icon: MessageSquare },
+  { id: 'dashboard',  label: 'Progress',       icon: BarChart3 },
+];
+
+const PROGRESS_STEPS = [
+  { key: 'profile',   label: 'Profile built'             },
+  { key: 'resume',    label: 'Resume reviewed'           },
+  { key: 'interview', label: 'Mock interview completed'  },
+];
+
+const LANGUAGES = [
+  { id: 'en', label: 'English' },
+  { id: 'zh', label: '中文'    },
+];
+
+// ───────────────────────────────────────────────────────────────
+// UI Translations — every visible string lives here
+// ───────────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  en: {
+    // Brand
+    brandTagline: 'AI recruiting, remembered.',
+    estLabel: 'Est. 2026',
+    // Sidebar sections
+    progress: 'Progress',
+    modules: 'Modules',
+    language: 'Language',
+    whatIRemember: 'What I remember',
+    // Modules
+    moduleOnboarding: 'Onboarding',
+    moduleResume: 'Resume',
+    moduleInterview: 'Mock Interview',
+    moduleDashboard: 'Progress',
+    // Progress steps
+    stepProfile: 'Profile built',
+    stepResume: 'Resume reviewed',
+    stepInterview: 'Mock interview completed',
+    // Module headers
+    moduleCounter: (i, n) => `Module ${i} / ${n}`,
+    onboardingSub: 'Build your persistent profile. One question at a time.',
+    resumeSub: 'Upload, review, build, and edit resumes.',
+    interviewSub: 'Structured mock interview with live rubric feedback.',
+    dashboardSub: 'Your profile, progress, and interview performance over time.',
+    backToLibrary: 'Back to library',
+    reset: 'Reset',
+    // Input
+    typeAnswer: 'Type your answer…',
+    askFollowup: 'Ask a follow-up…',
+    buildPlaceholder: 'Answer, paste links, attach files or images…',
+    attachFiles: 'Attach files (PDF, DOCX, Excel, images…)',
+    inputHint: 'Enter to send · Shift+Enter for new line · Data persists across sessions',
+    inputHintBuild: 'Enter to send · Shift+Enter for new line · Attach files/images, paste links (I can fetch them)',
+    // Resume library
+    yourLibrary: 'Your resume library',
+    extracting: 'Extracting text…',
+    uploadResume: 'Upload a resume',
+    fileTypes: 'PDF, DOCX, XLSX, or TXT · Max ~15k characters parsed',
+    chooseFile: 'Choose file',
+    onFile: (n) => `On file · ${n} ${n === 1 ? 'resume' : 'resumes'}`,
+    active: 'ACTIVE',
+    added: 'Added',
+    chars: 'chars',
+    builtInApp: 'built in-app',
+    uploaded: 'uploaded',
+    edit: 'Edit',
+    review: 'Review',
+    setActive: 'Set active',
+    noResumeYet: 'No resume yet?',
+    buildFromScratch: 'Build one from scratch',
+    buildDesc: "I'll guide you section by section. You can attach files (PDF, DOCX, Excel, images) or paste links to GitHub / LinkedIn / portfolios — I can fetch them.",
+    startBuilding: 'Start building',
+    confirmDeleteResume: 'Delete this resume from your library?',
+    uploadFailedPrefix: 'Upload failed: ',
+    scannedPdfError: 'Could not extract text (might be a scanned image or empty file).',
+    unsupportedFile: (ext) => `Unsupported file type: .${ext} (supported: PDF, DOCX, XLSX, CSV, TXT)`,
+    imageTooLarge: (name) => `${name} is too large (max 5MB).`,
+    // Interview setup
+    setup: 'Setup',
+    activeResumeLabel: 'Active resume',
+    noResumeWarning: 'No resume on file. The interview works better with one — upload or build one first.',
+    goToResume: 'Go to Resume module →',
+    noneUseProfile: '— None (use profile only) —',
+    targetRole: 'Target role',
+    targetRolePlaceholder: 'e.g. ML Research Intern',
+    targetCompany: 'Target company',
+    targetCompanyPlaceholder: 'e.g. Anthropic',
+    length: 'Length',
+    lite: 'Lite',
+    liteSub: '6 questions · ~15 min',
+    full: 'Full',
+    fullSub: '13 questions · ~35 min',
+    researchBanner: (role, company) => (
+      <>Before the interview starts, I'll use web search to find recent interview experiences, the ideal candidate profile, and required skills for <strong>{role || '[role]'}</strong> at <strong>{company || '[company]'}</strong>. Blocked sources are skipped silently.</>
+    ),
+    startInterview: 'Start Interview',
+    // Interview chat
+    researchFirstQ: 'Research + First Question',
+    feedbackLabel: 'Feedback',
+    interviewComplete: 'Interview complete · final report',
+    rubricSaved: 'Rubric scores saved to',
+    rubricSavedProgress: 'Progress',
+    // Rubric dimensions
+    dimStructure: 'Structure',
+    dimTechnicalDepth: 'Technical Depth',
+    dimCommunication: 'Communication',
+    dimRoleFit: 'Role Fit',
+    dimRedFlags: 'Red Flags',
+    // Dashboard
+    statProgress: 'Progress',
+    statProgressSub: 'milestones',
+    statResumes: 'Resumes',
+    statResumesSub: 'on file',
+    statAnswers: 'Interview answers',
+    statAnswersSub: 'scored',
+    profileHeading: 'Profile',
+    rubricTrend: 'Rubric trend · all answers',
+    latestSnapshot: 'Latest answer · snapshot',
+    legendStructure: 'Structure',
+    legendTechnical: 'Technical',
+    legendCommunication: 'Communication',
+    legendRoleFit: 'Role fit',
+    emptyDashboard: 'Nothing to show yet. Start with Onboarding.',
+    // Memory modal
+    persistentMemory: 'Persistent memory',
+    memoryTitle: 'What I remember about you',
+    memoryProfile: 'Profile',
+    memoryNoProfile: 'No profile yet — complete Onboarding to build one.',
+    memoryResumes: (n) => `Resumes on file · ${n}`,
+    memoryNoResumes: 'No resumes uploaded.',
+    clearAll: 'Clear all stored data',
+    confirmClearAll: 'Clear ALL stored data? This removes your profile, resumes, conversations, and rubric history permanently.',
+    // Resume editor
+    editorTitle: 'Resume editor',
+    undo: 'Undo',
+    exportPdf: 'PDF',
+    exportExcel: 'Excel',
+    exportDocx: 'Word',
+    loadingPdfLib: 'Loading PDF library…',
+    generatingPdf: 'Generating PDF…',
+    loadingExcelLib: 'Loading Excel library…',
+    generatingExcel: 'Generating Excel…',
+    loadingDocxLib: 'Loading Word library…',
+    generatingDocx: 'Generating Word document…',
+    pdfFailed: (msg) => `PDF export failed: ${msg}`,
+    excelFailed: (msg) => `Excel export failed: ${msg}`,
+    docxFailed: (msg) => `Word export failed: ${msg}`,
+    selectedChars: (n) => `Selected ${n} chars · optimize:`,
+    optConcise: 'Concise',
+    optMetrics: 'Add metrics',
+    optVerbs: 'Action verbs',
+    optProfessional: 'Professional tone',
+    customInstructionPlaceholder: 'Or type custom instruction…',
+    editorHint: 'Select any text and pick an optimization, or chat with me on the right →',
+    refinementChat: 'Refinement chat',
+    refinementSub: "Ask for changes. I'll revise the whole resume and you can apply it with one click.",
+    tryLabel: 'Try:',
+    example1: '"Make the projects section shorter"',
+    example2: '"Add a skills section"',
+    example3: '"Reorder experience by impact"',
+    example4: '"Rewrite the summary to target ML research roles"',
+    applyRevision: 'Apply revision to resume',
+    askForChange: 'Ask for a change…',
+  },
+  zh: {
+    brandTagline: 'AI 求职教练，记住你的每一步。',
+    estLabel: '2026 年创立',
+    progress: '进度',
+    modules: '模块',
+    language: '语言',
+    whatIRemember: '我记得的信息',
+    moduleOnboarding: '建立档案',
+    moduleResume: '简历',
+    moduleInterview: '模拟面试',
+    moduleDashboard: '进度面板',
+    stepProfile: '档案已建立',
+    stepResume: '简历已审阅',
+    stepInterview: '模拟面试已完成',
+    moduleCounter: (i, n) => `模块 ${i} / ${n}`,
+    onboardingSub: '建立你的长期档案，一次问一个问题。',
+    resumeSub: '上传、审阅、创建和编辑简历。',
+    interviewSub: '结构化模拟面试，每题实时打分反馈。',
+    dashboardSub: '你的档案、进度和面试表现历史。',
+    backToLibrary: '返回简历库',
+    reset: '重置',
+    typeAnswer: '输入回答…',
+    askFollowup: '继续追问…',
+    buildPlaceholder: '回答、粘贴链接、上传文件或图片…',
+    attachFiles: '上传文件（PDF、DOCX、Excel、图片等）',
+    inputHint: '回车发送 · Shift+回车换行 · 数据会跨会话保存',
+    inputHintBuild: '回车发送 · Shift+回车换行 · 可上传文件/图片、粘贴链接（我能直接访问）',
+    yourLibrary: '你的简历库',
+    extracting: '正在提取文本…',
+    uploadResume: '上传简历',
+    fileTypes: 'PDF、DOCX、XLSX 或 TXT · 最多解析约 15k 字符',
+    chooseFile: '选择文件',
+    onFile: (n) => `已保存 · ${n} 份简历`,
+    active: '当前使用',
+    added: '添加于',
+    chars: '字符',
+    builtInApp: '应用内创建',
+    uploaded: '上传',
+    edit: '编辑',
+    review: '审阅',
+    setActive: '设为当前',
+    noResumeYet: '还没有简历？',
+    buildFromScratch: '从零开始创建',
+    buildDesc: '我会一步步引导你。你可以上传文件（PDF、DOCX、Excel、图片），也可以粘贴 GitHub / LinkedIn / 个人网站的链接 —— 我可以直接访问。',
+    startBuilding: '开始创建',
+    confirmDeleteResume: '从简历库中删除这份简历？',
+    uploadFailedPrefix: '上传失败：',
+    scannedPdfError: '无法提取文本（可能是扫描版图片或空文件）。',
+    unsupportedFile: (ext) => `不支持的文件类型：.${ext}（支持：PDF、DOCX、XLSX、CSV、TXT）`,
+    imageTooLarge: (name) => `${name} 文件过大（最大 5MB）。`,
+    setup: '设置',
+    activeResumeLabel: '当前简历',
+    noResumeWarning: '还没有简历。建议先上传或创建一份，面试效果会更好。',
+    goToResume: '前往简历模块 →',
+    noneUseProfile: '— 不使用简历（仅用档案） —',
+    targetRole: '目标岗位',
+    targetRolePlaceholder: '例如：机器学习研究实习生',
+    targetCompany: '目标公司',
+    targetCompanyPlaceholder: '例如：Anthropic',
+    length: '时长',
+    lite: '简短',
+    liteSub: '6 题 · 约 15 分钟',
+    full: '完整',
+    fullSub: '13 题 · 约 35 分钟',
+    researchBanner: (role, company) => (
+      <>面试开始前，我会通过网络搜索查找 <strong>{company || '[公司]'}</strong> 的 <strong>{role || '[岗位]'}</strong> 最近的面经、理想候选人画像和技能要求。无法访问的来源会被静默跳过。</>
+    ),
+    startInterview: '开始面试',
+    researchFirstQ: '调研 + 第一题',
+    feedbackLabel: '反馈',
+    interviewComplete: '面试完成 · 最终报告',
+    rubricSaved: '评分已保存到',
+    rubricSavedProgress: '进度面板',
+    dimStructure: '结构',
+    dimTechnicalDepth: '技术深度',
+    dimCommunication: '表达',
+    dimRoleFit: '岗位匹配',
+    dimRedFlags: '风险点',
+    statProgress: '进度',
+    statProgressSub: '里程碑',
+    statResumes: '简历',
+    statResumesSub: '已保存',
+    statAnswers: '面试答题',
+    statAnswersSub: '已评分',
+    profileHeading: '档案',
+    rubricTrend: '评分趋势 · 全部答题',
+    latestSnapshot: '最新答题 · 快照',
+    legendStructure: '结构',
+    legendTechnical: '技术',
+    legendCommunication: '表达',
+    legendRoleFit: '岗位匹配',
+    emptyDashboard: '还没有数据，先从建立档案开始吧。',
+    persistentMemory: '长期记忆',
+    memoryTitle: '我记得关于你的信息',
+    memoryProfile: '档案',
+    memoryNoProfile: '还没有档案 — 完成建档模块即可创建。',
+    memoryResumes: (n) => `简历库 · ${n} 份`,
+    memoryNoResumes: '还没有上传简历。',
+    clearAll: '清除所有保存的数据',
+    confirmClearAll: '清除所有保存的数据？这会永久删除你的档案、简历、对话和评分历史。',
+    editorTitle: '简历编辑器',
+    undo: '撤销',
+    exportPdf: 'PDF',
+    exportExcel: 'Excel',
+    exportDocx: 'Word',
+    loadingPdfLib: '正在加载 PDF 库…',
+    generatingPdf: '正在生成 PDF…',
+    loadingExcelLib: '正在加载 Excel 库…',
+    generatingExcel: '正在生成 Excel…',
+    loadingDocxLib: '正在加载 Word 库…',
+    generatingDocx: '正在生成 Word 文档…',
+    pdfFailed: (msg) => `PDF 导出失败：${msg}`,
+    excelFailed: (msg) => `Excel 导出失败：${msg}`,
+    docxFailed: (msg) => `Word 导出失败：${msg}`,
+    selectedChars: (n) => `已选中 ${n} 个字符 · 优化方式：`,
+    optConcise: '精简',
+    optMetrics: '加数据',
+    optVerbs: '强动词',
+    optProfessional: '专业语气',
+    customInstructionPlaceholder: '或输入自定义指令…',
+    editorHint: '选中任意文字选择优化方式，或在右侧与我对话 →',
+    refinementChat: '优化对话',
+    refinementSub: '告诉我你想改什么，我会修改整份简历，你可以一键应用。',
+    tryLabel: '试试：',
+    example1: '"项目部分再精简一些"',
+    example2: '"加一个技能栏"',
+    example3: '"按影响力排序实习经历"',
+    example4: '"把 summary 改成针对 ML 研究岗位"',
+    applyRevision: '应用到简历',
+    askForChange: '告诉我要改什么…',
+  },
+};
+
+const getT = (language) => TRANSLATIONS[language] || TRANSLATIONS.en;
+
+// ───────────────────────────────────────────────────────────────
+// Tone standard — injected into every system prompt
+// ───────────────────────────────────────────────────────────────
+const TONE_STANDARD = `TONE STANDARD (strict):
+- Be professional, calibrated, constructive. Push the student toward growth.
+- NO effusive praise. Forbidden phrases: "太厉害了", "太棒了", "amazing", "impressive", "perfect", "绝对是亮点", "这绝对是加分项". Instead, state facts flatly: "A first-author workshop paper is a solid credential for industry SWE roles; for top PhD programs, main-conference submissions would matter more."
+- NO false reassurance that discourages more work. Forbidden patterns: "没关系，你的经历已经很丰富了，不需要额外的项目/论文/实习", "you don't need more". If more work would genuinely help them reach the next level, SAY SO. Example: "Your 3 internships are a solid foundation; for competitive quant roles, consider 1-2 side projects demonstrating independent research initiative."
+- Always acknowledge facts briefly, then point to the next level up. Your job is to help them improve, not to make them feel good.
+- When giving feedback, be specific and actionable — name the thing to change and how to change it.`;
+
+const languageInstruction = (lang) => {
+  if (lang === 'zh') return 'LANGUAGE: Respond ONLY in Chinese (中文), regardless of what language the student writes in. All headers, labels, and tokens you output should be in Chinese too (except for the literal markers like [PROFILE_COMPLETE], [RESUME_REVIEWED], [RESUME_DRAFT_START], [RESUME_DRAFT_END], [REVISED], which must stay in English so the app can parse them).';
+  return 'LANGUAGE: Respond ONLY in English, regardless of what language the student writes in.';
+};
+
+// ───────────────────────────────────────────────────────────────
+// System prompts
+// ───────────────────────────────────────────────────────────────
+const buildSystemPrompt = (module, state) => {
+  const {
+    profile, progress, activeResume,
+    targetRole, targetCompany, interviewMode, questionNumber,
+    resumeSubmode, language,
+  } = state;
+
+  const profileContext = profile
+    ? `STUDENT PROFILE (your persistent memory of this student):\n${JSON.stringify(profile, null, 2)}`
+    : 'STUDENT PROFILE: Not yet built.';
+
+  const progressContext = `PROGRESS STATE: ${JSON.stringify(progress)}`;
+
+  const base = `You are an expert AI recruiting coach helping students land internships and full-time roles. You maintain a persistent memory of each student's profile across all sessions.
+
+${profileContext}
+
+${progressContext}
+
+${languageInstruction(language)}
+
+${TONE_STANDARD}
+
+CONVERSATIONAL RULES: Always ask ONE question at a time. Never present a list of questions together. Adapt difficulty to the student's experience level.
+
+ETHICAL GUARDRAIL: Never help fabricate experience or exaggerate credentials. Help the student express their real experience more clearly.`;
+
+  // ─── ONBOARDING ───
+  if (module === 'onboarding') {
+    return base + `
+
+CURRENT TASK: Onboarding. The student has already seen a brief greeting and been asked for their NAME. Continue the profile collection from there.
+
+Collect these 10 fields IN THIS EXACT ORDER, ONE QUESTION AT A TIME:
+1. name
+2. school
+3. grade/year
+4. concentration/major
+5. relevant coursework
+6. past internships or work experience
+7. research or publications
+8. target country
+9. target industry
+10. target role
+
+RULES:
+- Look at STUDENT PROFILE above to see which fields are already filled. Continue from the first unfilled field.
+- After each answer, acknowledge it in ONE SHORT factual sentence (NOT praise — e.g. "Got it." / "Noted." / "好的。"). Do NOT compliment schools, majors, or experiences. Just record and move on.
+- NEVER batch questions. NEVER skip ahead.
+- Once all 10 fields are collected, present a clean summary of the full profile and ask "Does this look right? / 这样对吗？"
+- After the student explicitly confirms, respond with ONE brief congratulatory line (still no effusion), then display the updated progress tracker:
+  ✅ Profile built | ⬜ Resume reviewed | ⬜ Mock interview completed
+- On the LAST LINE of your message output this exact token (so the app can save the profile):
+  [PROFILE_COMPLETE]{"name":"...","school":"...","year":"...","major":"...","coursework":"...","experience":"...","research":"...","target_country":"...","target_industry":"...","target_role":"..."}
+
+If STUDENT PROFILE shows all fields are already filled, do NOT re-ask. Greet briefly, mention what you remember, and suggest Resume or Mock Interview. If they want to update a specific field, help them update just that one.`;
+  }
+
+  // ─── RESUME ───
+  if (module === 'resume') {
+    if (resumeSubmode === 'review' && activeResume) {
+      return base + `
+
+CURRENT TASK: Resume Review.
+
+RESUME FILENAME: ${activeResume.filename}
+RESUME TEXT:
+"""
+${activeResume.text.slice(0, 8000)}
+"""
+
+Produce a detailed review structured as:
+
+**Overall impression** — 2-3 sentences, factual, no effusion.
+
+**Strengths** — 3-5 bullets. For each: quote the exact resume line in italics, then explain precisely why it works. Do NOT say things like "绝对是亮点"; instead say "this demonstrates X concretely".
+
+**Specific weaknesses with line-level callouts** — 3-5 bullets. For each: quote the line, explain the issue precisely, then give a concrete alternative phrasing.
+
+**Top 3 priority fixes** — ranked list of the most impactful changes.
+
+**Next level up** — 1-2 sentences on what ADDITIONAL work (projects, papers, experiences) would strengthen this resume for their target role. Never tell them "you don't need more" — always point to the next level.
+
+After the review, end with the progress tracker:
+✅ Profile built | ✅ Resume reviewed | ⬜ Mock interview completed
+
+And on the final line: [RESUME_REVIEWED]`;
+    }
+
+    if (resumeSubmode === 'build') {
+      return base + `
+
+CURRENT TASK: Guide the student to build a resume from scratch.
+
+The student can attach files (PDF transcripts, DOCX offer letters, Excel project lists, images of certificates, screenshots of projects) and paste links (GitHub, LinkedIn, portfolio sites, company pages). Extract relevant information from ALL provided materials.
+
+YOU HAVE THE web_search TOOL. Use it to:
+- Fetch and read the content of any URL the student pastes (GitHub repos, LinkedIn profiles, personal websites, company pages, course catalogs)
+- Look up companies, roles, and programs the student mentions, when it helps produce better resume copy
+- If a search returns a rate limit or error, skip silently and ask the student to paste the content or describe it instead. Never retry a blocked source.
+
+Walk them through these sections, asking ONE question at a time:
+1. Education (school, degree, graduation, GPA, relevant coursework)
+2. Each work/internship experience (one at a time — company, role, dates, 2-4 bullet points of achievements)
+3. Projects (2-3 strongest — ask for GitHub links or descriptions; fetch the repos if linked)
+4. Skills (technical + language)
+5. Awards/publications (if any)
+
+RULES:
+- ONE question at a time. NEVER dump multiple questions.
+- Factual acknowledgments only. No praise ("Got it" not "太厉害了").
+- For work experiences, first ask "how many do you have?", then collect them one by one.
+- When the student pastes a LINK, actually fetch it via web_search before responding.
+- When the student uploads an IMAGE, describe what you see and extract useful information.
+- When the student uploads a FILE (PDF/DOCX/XLSX), its text will be injected into their message wrapped in "--- Attached file: NAME ---" markers. Read it carefully.
+- When you have enough content, generate the final resume as STRUCTURED JSON (see format below).
+
+RESUME_JSON FORMAT (strict — the app parses this):
+Wrap the final resume between these exact markers:
+
+[RESUME_JSON_START]
+{
+  "header": {
+    "name": "杨子悦",
+    "phone": "+86 18321666660",
+    "email": "ziyue_yang@brown.edu",
+    "location": "中国上海",
+    "links": []
+  },
+  "sections": [
+    {
+      "type": "education",
+      "title": "教育背景",
+      "items": [
+        {
+          "org": "布朗大学",
+          "role": "计算机科学（人工智能方向）与金融本科双学士，音乐辅修",
+          "location": "",
+          "dateRange": "2027届",
+          "bullets": [
+            "绩点: 4.00/4.00",
+            "相关课程: 自然语言处理（NLP）、计算机视觉（CV）、深度学习、机器学习",
+            "荣誉奖项: 布朗大学本科研究（UTRA）、布朗大学研究基金（RAB）、布朗音乐奖",
+            "技能: 自然语言处理 | 提示工程、文本预处理、RAG、大模型评估与基准测试..."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "research",
+      "title": "研究与论文发表",
+      "items": [
+        {
+          "org": "多模态生成模型Token Dance: 基于双向Mamba的音乐到舞蹈Token-to-Token生成",
+          "role": "共同第一作者，入选CVPR 2026 Workshop HumoGen (计算机视觉CCF-A会)",
+          "location": "",
+          "dateRange": "2025 六月–至今",
+          "bullets": [
+            "提出多模态音乐到舞蹈生成框架（TokenDance），通过FSQ对音乐与舞蹈进行双模态离散化...",
+            "在FineDance数据集上实现了全局质量提升（FIDg 34.29→31.85）、全局多样性提升（DIVg 5.64→6.81）..."
+          ]
+        }
+      ]
+    },
+    { "type": "experience", "title": "工作经历", "items": [...] },
+    { "type": "projects", "title": "项目", "items": [...] },
+    { "type": "skills", "title": "技能", "items": [{ "org": "", "role": "", "location": "", "dateRange": "", "bullets": ["Python", "PyTorch", "TensorFlow"] }] }
+  ]
+}
+[RESUME_JSON_END]
+
+SCHEMA RULES:
+- Every item MUST have all five fields: org, role, location, dateRange, bullets (use empty string "" or empty array [] if unused).
+- org = company/school/paper title (bold in render)
+- role = job title / degree / authorship description (italic in render)
+- location = city (right-aligned top line, optional)
+- dateRange = date or date range (right-aligned bottom line)
+- bullets = array of achievement strings (rendered as •-bullets)
+- Section "title" must be in the student's language (Chinese if the conversation is in Chinese)
+- Sections typically in this order: education, research (if any), experience, projects (if any), skills
+- Do NOT output markdown, do NOT output anything else between the JSON markers
+- After the JSON block, end with: ✅ Profile built | ✅ Resume reviewed | ⬜ Mock interview completed
+- On the final line: [RESUME_REVIEWED]`;
+    }
+
+    return base + `
+
+CURRENT TASK: Resume Mode entry point.
+
+Ask the student briefly if they have a resume:
+- If YES: tell them to upload it (PDF, DOCX, or TXT) using the upload zone at the top of the page.
+- If NO: offer to build one together, section by section. Mention they can attach images (certificates, transcripts) or paste links/text along the way.
+
+Be brief. Do NOT start asking resume-building questions until they confirm.`;
+  }
+
+  // ─── INTERVIEW ───
+  if (module === 'interview') {
+    const plan = interviewMode === 'lite'
+      ? `LITE MODE — 6 questions total:
+  Q1: Tell Me About Yourself
+  Q2: 1 resume-based question
+  Q3-Q4: 2 technical questions (from 面经 patterns)
+  Q5: 1 behavioral question
+  Q6: 1 why-company/why-role question`
+      : `FULL MODE — 13 questions total:
+  Q1: Tell Me About Yourself
+  Q2-Q4: 3 resume-based questions
+  Q5-Q7: 3 technical questions (from 面经 patterns)
+  Q8-Q10: 3 behavioral questions
+  Q11-Q13: 3 questions on why company / why role / why them`;
+
+    const resumeContext = activeResume
+      ? `ACTIVE RESUME (${activeResume.filename}):\n"""\n${activeResume.text.slice(0, 6000)}\n"""`
+      : 'ACTIVE RESUME: None — adapt questions using the student profile above.';
+
+    return base + `
+
+CURRENT TASK: Mock Interview — scoring the student's last answer and asking the next question.
+
+TARGET ROLE: ${targetRole}
+TARGET COMPANY: ${targetCompany}
+${resumeContext}
+
+${plan}
+
+CURRENT QUESTION NUMBER: ${questionNumber} (this is the question the student just answered)
+
+RESPONSE FORMAT: You MUST respond in valid JSON only. No markdown fences, no prose outside JSON. Schema:
+{
+  "feedback": "string — specific, calibrated coaching feedback on the student's last answer, 2-4 sentences. Quote their words where useful. Be honest, NOT effusive. Point to what to improve.",
+  "rubric": {
+    "structure": 1-5,
+    "technical_depth": 1-5,
+    "communication": 1-5,
+    "role_fit": 1-5,
+    "red_flags": 0-3
+  },
+  "next_question": "the next interview question string per the plan above, OR 'INTERVIEW_COMPLETE'",
+  "question_type": "tmay|resume|technical|behavioral|why",
+  "question_label": "short label like 'Technical 2/3'"
+}
+
+When next_question is 'INTERVIEW_COMPLETE', the feedback field must contain a comprehensive report — strengths (factual, specific), priority improvements (actionable), and this line at the end:
+✅ Profile built | ✅ Resume reviewed | ✅ Mock interview completed
+
+QUESTION ADAPTATION BY ROLE:
+- SWE → DSA, system design, debugging
+- ML/Research → paper depth, modeling tradeoffs, research taste
+- Quant → probability, brainteasers
+- PM → product sense, prioritization, metrics
+- Data → SQL, stats, experiment design
+
+Use the resume for resume-based questions. Be realistic and company-specific.`;
+  }
+
+  return base;
+};
+
+const buildInterviewResearchPrompt = (state) => {
+  const { profile, activeResume, targetRole, targetCompany, interviewMode, language } = state;
+  const profileContext = profile
+    ? `Student profile:\n${JSON.stringify(profile, null, 2)}`
+    : 'Student profile: not on file.';
+  const resumeContext = activeResume
+    ? `Student resume (${activeResume.filename}):\n"""\n${activeResume.text.slice(0, 5000)}\n"""`
+    : 'Student resume: none uploaded.';
+  const plan = interviewMode === 'lite' ? '6 questions' : '13 questions';
+
+  return `You are an expert AI recruiting coach about to run a mock interview.
+
+${profileContext}
+
+${resumeContext}
+
+TARGET ROLE: ${targetRole}
+TARGET COMPANY: ${targetCompany}
+PLANNED LENGTH: ${plan}
+
+${languageInstruction(language)}
+
+${TONE_STANDARD}
+
+TASK:
+Step 1 — Use the web_search tool to research:
+  (a) Recent interview experiences (面经) for this role at this company from Glassdoor, Blind, 一亩三分地, Leetcode discuss, Reddit
+  (b) The ideal candidate profile
+  (c) Required technical skills
+
+CRITICAL: If any search returns a rate limit or error, skip that source silently and use successful searches. Never retry a blocked source. If no searches succeed, fall back to training knowledge and label it as general guidance.
+
+Step 2 — Write a brief research summary (3-5 bullet points). Factual, no effusion. Cite company-specific patterns when possible.
+
+Step 3 — Briefly introduce the mock interview format (${plan}) and ask the first question: "Tell me about yourself." End your message with ONLY that question.
+
+OUTPUT: Plain markdown text, no JSON.`;
+};
+
+const buildEditorChatPrompt = ({ content, profile, language }) => `You are an expert resume editor helping the student refine their resume in real-time.
+
+CURRENT RESUME:
+"""
+${content}
+"""
+
+STUDENT PROFILE: ${profile ? JSON.stringify(profile) : 'none'}
+
+${languageInstruction(language)}
+
+${TONE_STANDARD}
+
+When the student asks for a change:
+1. Start with a 1-2 sentence explanation in the chat of what you're changing and why. Factual tone.
+2. Wrap the FULL revised resume in [REVISED]...[/REVISED] tags at the END of your message.
+
+If the student asks a question that doesn't require changes, just answer briefly without the tags.`;
+
+const buildSelectionEditPrompt = ({ content, selection, action, language }) => ({
+  system: `You are an expert resume editor. Rewrite the given section using strong action verbs, quantified metrics, and concise professional language. Do NOT add content unsupported by the original. Match the input format (bullet, paragraph, header). ${languageInstruction(language)}`,
+  messages: [{
+    role: 'user',
+    content: `Full resume context:
+"""
+${content}
+"""
+
+Section to rewrite:
+"""
+${selection}
+"""
+
+Action: ${action}
+
+Return ONLY the rewritten section. No explanations, no quotes, no markdown fences, no preamble.`
+  }],
+});
+
+// ───────────────────────────────────────────────────────────────
+// API
+// ───────────────────────────────────────────────────────────────
+async function callClaude({ messages, system, expectJson = false, maxTokens = 2500, useWebSearch = false }) {
+  try {
+    const body = { model: MODEL, max_tokens: maxTokens, system, messages };
+    if (useWebSearch) {
+      body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+    }
+
+    // Get Supabase JWT for auth
+    const session = await supabase.auth.getSession();
+    const jwt = session?.data?.session?.access_token;
+    if (!jwt) {
+      return { raw: '', error: 'Not authenticated. Please log in again.' };
+    }
+
+    const response = await fetch('/api/claude', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwt}`,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      return { raw: '', error: `HTTP ${response.status}: ${errText.slice(0, 200)}` };
+    }
+    const data = await response.json();
+    const text = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n\n');
+
+    if (expectJson) {
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      const candidate = match ? match[0] : cleaned;
+      try {
+        return { json: JSON.parse(candidate), raw: text };
+      } catch (e) {
+        return { json: null, raw: text, parseError: e.message };
+      }
+    }
+    return { raw: text };
+  } catch (err) {
+    return { raw: '', error: err.message };
+  }
+}
+
+// ───────────────────────────────────────────────────────────────
+// Storage
+// ───────────────────────────────────────────────────────────────
+async function loadStorage(key, fallback) {
+  try {
+    if (!currentUserId) return fallback;
+    const field = key.replace('coach:', '');
+    if (field in dataCache) return dataCache[field];
+    const { data, error } = await supabase
+      .from('user_data')
+      .select(field)
+      .eq('user_id', currentUserId)
+      .single();
+    if (error || !data) return fallback;
+    const val = data[field];
+    if (val != null) {
+      dataCache[field] = val;
+      return val;
+    }
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+async function saveStorage(key, value) {
+  if (!currentUserId) return;
+  const field = key.replace('coach:', '');
+  dataCache[field] = value;
+  clearTimeout(saveTimers[field]);
+  saveTimers[field] = setTimeout(async () => {
+    try {
+      await supabase.from('user_data').upsert(
+        { user_id: currentUserId, [field]: value, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      );
+    } catch (e) {
+      console.error('Save failed:', field, e);
+    }
+  }, 1000);
+}
+async function clearAllStorage() {
+  if (!currentUserId) return;
+  dataCache = {};
+  try {
+    await supabase.from('user_data').delete().eq('user_id', currentUserId);
+    // Re-create empty row
+    await supabase.from('user_data').insert({ user_id: currentUserId });
+  } catch {}
+}
+
+// Strip base64 image data before persisting (too large for storage)
+const serializeMessagesForStorage = (messages) => {
+  return messages.map(m => {
+    if (Array.isArray(m.content)) {
+      const textParts = m.content.filter(b => b.type === 'text').map(b => b.text);
+      const imageCount = m.content.filter(b => b.type === 'image').length;
+      const imgNote = imageCount > 0 ? `\n[${imageCount} image${imageCount > 1 ? 's' : ''} attached]` : '';
+      return { role: m.role, content: (textParts.join('\n') + imgNote).trim() };
+    }
+    const { displayAttachments, ...rest } = m;
+    return rest;
+  });
+};
+
+// ───────────────────────────────────────────────────────────────
+// Dynamic library loaders
+// ───────────────────────────────────────────────────────────────
+const loadScript = (src, globalKey) => new Promise((resolve, reject) => {
+  if (window[globalKey]) return resolve(window[globalKey]);
+  const script = document.createElement('script');
+  script.src = src;
+  script.onload = () => {
+    if (window[globalKey]) resolve(window[globalKey]);
+    else reject(new Error(`${globalKey} did not initialize`));
+  };
+  script.onerror = () => reject(new Error(`Failed to load ${src}`));
+  document.head.appendChild(script);
+});
+
+const loadPdfJs = async () => {
+  if (window.pdfjsLib) return window.pdfjsLib;
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'pdfjsLib');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  return window.pdfjsLib;
+};
+
+const loadHtml2Pdf = () => loadScript(
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+  'html2pdf'
+);
+
+const loadXlsx = () => loadScript(
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'XLSX'
+);
+
+const loadJSZip = () => loadScript(
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+  'JSZip'
+);
+
+// ───────────────────────────────────────────────────────────────
+// DOCX generator (hand-rolled, no external docx library)
+// ───────────────────────────────────────────────────────────────
+const escXml = (s) => (s == null ? '' : String(s))
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&apos;');
+
+const docxRun = ({ text, bold = false, italic = false, size = null, color = null }) => {
+  const rpr = [];
+  if (bold) rpr.push('<w:b/>');
+  if (italic) rpr.push('<w:i/>');
+  if (size) rpr.push(`<w:sz w:val="${size * 2}"/>`); // half-points
+  if (color) rpr.push(`<w:color w:val="${color}"/>`);
+  const rprXml = rpr.length ? `<w:rPr>${rpr.join('')}</w:rPr>` : '';
+  return `<w:r>${rprXml}<w:t xml:space="preserve">${escXml(text)}</w:t></w:r>`;
+};
+
+const docxTab = () => '<w:r><w:tab/></w:r>';
+
+const docxParagraph = ({
+  runs = [], align = null, tabRight = null,
+  border = false, indent = null, spacing = null,
+}) => {
+  const pprParts = [];
+  if (tabRight) {
+    pprParts.push(`<w:tabs><w:tab w:val="right" w:pos="${tabRight}"/></w:tabs>`);
+  }
+  if (align) pprParts.push(`<w:jc w:val="${align}"/>`);
+  if (border) pprParts.push('<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="2" w:color="000000"/></w:pBdr>');
+  if (indent) pprParts.push(`<w:ind w:left="${indent}" w:hanging="180"/>`);
+  if (spacing) {
+    const before = spacing.before || 0;
+    const after = spacing.after || 0;
+    pprParts.push(`<w:spacing w:before="${before}" w:after="${after}"/>`);
+  }
+  const ppr = pprParts.length ? `<w:pPr>${pprParts.join('')}</w:pPr>` : '';
+  return `<w:p>${ppr}${runs.join('')}</w:p>`;
+};
+
+async function zipDocxParagraphs(paragraphs) {
+  const JSZip = await loadJSZip();
+  const zip = new JSZip();
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>${paragraphs.join('')}
+<w:sectPr>
+<w:pgSz w:w="12240" w:h="15840"/>
+<w:pgMar w:top="1080" w:right="1440" w:bottom="1080" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>
+</w:sectPr>
+</w:body>
+</w:document>`;
+  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+  const rootRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+  zip.file('[Content_Types].xml', contentTypesXml);
+  zip.folder('_rels').file('.rels', rootRelsXml);
+  zip.folder('word').file('document.xml', documentXml);
+  return await zip.generateAsync({ type: 'blob' });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function buildStructuredResumeDocx(data) {
+  const paragraphs = [];
+  // Centered name (24pt bold)
+  paragraphs.push(docxParagraph({
+    runs: [docxRun({ text: data.header?.name || '', bold: true, size: 24 })],
+    align: 'center',
+  }));
+  // Centered contact (10pt)
+  const contactParts = [data.header?.phone, data.header?.email, data.header?.location].filter(Boolean);
+  if (contactParts.length) {
+    const contactRuns = [];
+    contactParts.forEach((p, i) => {
+      if (i > 0) contactRuns.push(docxRun({ text: '  |  ', size: 10 }));
+      contactRuns.push(docxRun({ text: p, size: 10 }));
+    });
+    paragraphs.push(docxParagraph({
+      runs: contactRuns,
+      align: 'center',
+      spacing: { after: 160 },
+    }));
+  }
+  // Sections
+  for (const sec of data.sections || []) {
+    paragraphs.push(docxParagraph({
+      runs: [docxRun({ text: sec.title || '', bold: true, size: 13 })],
+      border: true,
+      spacing: { before: 200, after: 60 },
+    }));
+    for (const item of sec.items || []) {
+      if (item.org || item.location) {
+        const topRuns = [];
+        if (item.org) topRuns.push(docxRun({ text: item.org, bold: true, size: 11 }));
+        if (item.location) {
+          topRuns.push(docxTab());
+          topRuns.push(docxRun({ text: item.location, bold: true, size: 11 }));
+        }
+        paragraphs.push(docxParagraph({ runs: topRuns, tabRight: 9000 }));
+      }
+      if (item.role || item.dateRange) {
+        const midRuns = [];
+        if (item.role) midRuns.push(docxRun({ text: item.role, italic: true, size: 11 }));
+        if (item.dateRange) {
+          midRuns.push(docxTab());
+          midRuns.push(docxRun({ text: item.dateRange, italic: true, size: 11 }));
+        }
+        paragraphs.push(docxParagraph({ runs: midRuns, tabRight: 9000 }));
+      }
+      for (const b of item.bullets || []) {
+        if (!b) continue;
+        paragraphs.push(docxParagraph({
+          runs: [docxRun({ text: '• ' + b, size: 11 })],
+          indent: 360,
+        }));
+      }
+      paragraphs.push(docxParagraph({ runs: [], spacing: { after: 80 } }));
+    }
+  }
+  return await zipDocxParagraphs(paragraphs);
+}
+
+async function buildMarkdownResumeDocx(content) {
+  const paragraphs = [];
+  for (const line of (content || '').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      paragraphs.push(docxParagraph({ runs: [] }));
+      continue;
+    }
+    if (/^#\s/.test(trimmed)) {
+      paragraphs.push(docxParagraph({
+        runs: [docxRun({ text: trimmed.replace(/^#\s/, ''), bold: true, size: 20 })],
+        align: 'center',
+        spacing: { after: 120 },
+      }));
+    } else if (/^##\s/.test(trimmed)) {
+      paragraphs.push(docxParagraph({
+        runs: [docxRun({ text: trimmed.replace(/^##\s/, ''), bold: true, size: 13 })],
+        border: true,
+        spacing: { before: 200, after: 60 },
+      }));
+    } else if (/^###\s/.test(trimmed)) {
+      paragraphs.push(docxParagraph({
+        runs: [docxRun({ text: trimmed.replace(/^###\s/, ''), bold: true, size: 11 })],
+      }));
+    } else if (/^[-•*]\s/.test(trimmed)) {
+      paragraphs.push(docxParagraph({
+        runs: [docxRun({ text: '• ' + trimmed.replace(/^[-•*]\s/, ''), size: 11 })],
+        indent: 360,
+      }));
+    } else {
+      paragraphs.push(docxParagraph({
+        runs: [docxRun({ text: trimmed, size: 11 })],
+      }));
+    }
+  }
+  return await zipDocxParagraphs(paragraphs);
+}
+
+// ───────────────────────────────────────────────────────────────
+// File parsing
+// ───────────────────────────────────────────────────────────────
+async function extractFileText(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'txt' || ext === 'md') {
+    return (await file.text()).trim();
+  }
+  if (ext === 'docx') {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return (result.value || '').trim();
+  }
+  if (ext === 'pdf') {
+    const pdfjsLib = await loadPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content.items.map(item => item.str).join(' '));
+    }
+    return pages.join('\n\n').trim();
+  }
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+    const XLSX = await loadXlsx();
+    const arrayBuffer = await file.arrayBuffer();
+    const wb = XLSX.read(arrayBuffer, { type: 'array' });
+    const parts = wb.SheetNames.map(name => {
+      return `[Sheet: ${name}]\n${XLSX.utils.sheet_to_csv(wb.Sheets[name])}`;
+    });
+    return parts.join('\n\n').trim();
+  }
+  throw new Error(`Unsupported file type: .${ext} (supported: PDF, DOCX, XLSX, CSV, TXT)`);
+}
+
+async function fileToBase64Image(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      const base64 = result.split(',')[1];
+      resolve({ base64, mediaType: file.type });
+    };
+    reader.onerror = () => reject(new Error('Failed to read image'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ───────────────────────────────────────────────────────────────
+// Structured resume helpers
+// ───────────────────────────────────────────────────────────────
+const EMPTY_RESUME = () => ({
+  header: { name: '', phone: '', email: '', location: '', links: [] },
+  sections: [],
+});
+
+const EMPTY_ITEM = () => ({
+  org: '', role: '', location: '', dateRange: '', bullets: [],
+});
+
+function structuredToPlainText(r) {
+  if (!r) return '';
+  const lines = [];
+  if (r.header) {
+    if (r.header.name) lines.push(r.header.name);
+    const contact = [r.header.phone, r.header.email, r.header.location].filter(Boolean).join(' | ');
+    if (contact) lines.push(contact);
+    lines.push('');
+  }
+  for (const sec of r.sections || []) {
+    lines.push(`## ${sec.title || ''}`);
+    for (const item of sec.items || []) {
+      const top = [item.org, item.location].filter(Boolean).join('  ');
+      const mid = [item.role, item.dateRange].filter(Boolean).join('  ');
+      if (top) lines.push(top);
+      if (mid) lines.push(mid);
+      for (const b of item.bullets || []) lines.push(`• ${b}`);
+      lines.push('');
+    }
+  }
+  return lines.join('\n').trim();
+}
+
+// Ask Claude to convert a plain-text/markdown resume into our structured schema
+async function parseResumeTextToStructured(text, language) {
+  const langInstr = language === 'zh'
+    ? 'All section titles must be in Chinese.'
+    : 'All section titles must be in English.';
+  const system = `You are a resume parser. Convert the given resume text into structured JSON matching this exact schema:
+
+{
+  "header": { "name": "", "phone": "", "email": "", "location": "", "links": [] },
+  "sections": [
+    {
+      "type": "education|research|experience|projects|skills|awards|other",
+      "title": "",
+      "items": [
+        { "org": "", "role": "", "location": "", "dateRange": "", "bullets": [] }
+      ]
+    }
+  ]
+}
+
+Rules:
+- Every item MUST have all 5 fields (use "" or [] if missing).
+- org = company/school/project/paper title (shown bold)
+- role = job title / degree / authorship line (shown italic)
+- dateRange = date or date range string
+- bullets = array of achievement strings, each starting with an action verb, kept verbatim from source
+- Preserve all information from the source — do NOT invent or drop content
+- ${langInstr}
+- Output ONLY the JSON, no markdown fences, no prose.`;
+
+  const result = await callClaude({
+    messages: [{ role: 'user', content: `Resume text:\n\n${text}` }],
+    system,
+    maxTokens: 4000,
+  });
+  if (!result.raw) return null;
+  const cleaned = result.raw.replace(/```json|```/g, '').trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    return null;
+  }
+}
+
+// ───────────────────────────────────────────────────────────────
+// Markdown renderer
+// ───────────────────────────────────────────────────────────────
+function renderMarkdown(text) {
+  if (!text) return null;
+  const lines = text.split('\n');
+  const blocks = [];
+  let listBuffer = [];
+
+  const flushList = () => {
+    if (listBuffer.length) {
+      blocks.push(
+        <ul key={`ul-${blocks.length}`} className="my-2 space-y-1 pl-4">
+          {listBuffer.map((item, i) => (
+            <li key={i} className="text-[14.5px] leading-relaxed list-disc marker:text-[#4A7C59]">
+              {renderInline(item)}
+            </li>
+          ))}
+        </ul>
+      );
+      listBuffer = [];
+    }
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+    if (/^[-•*]\s/.test(trimmed)) {
+      listBuffer.push(trimmed.replace(/^[-•*]\s/, ''));
+    } else if (/^#{1,3}\s/.test(trimmed)) {
+      flushList();
+      const level = trimmed.match(/^#+/)[0].length;
+      const content = trimmed.replace(/^#+\s/, '');
+      const size = level === 1 ? 'text-lg' : level === 2 ? 'text-base' : 'text-sm';
+      blocks.push(
+        <div key={idx} className={`font-display ${size} font-semibold mt-3 mb-1 text-[#0F3D2E]`}>
+          {renderInline(content)}
+        </div>
+      );
+    } else if (trimmed === '') {
+      flushList();
+    } else {
+      flushList();
+      blocks.push(
+        <p key={idx} className="text-[14.5px] leading-relaxed my-1.5">
+          {renderInline(trimmed)}
+        </p>
+      );
+    }
+  });
+  flushList();
+  return blocks;
+}
+
+function renderInline(text) {
+  const parts = [];
+  let remaining = text;
+  let key = 0;
+  while (remaining.length) {
+    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    const italicMatch = remaining.match(/\*(.+?)\*/);
+    const firstBold = boldMatch ? boldMatch.index : Infinity;
+    const firstItalic = italicMatch ? italicMatch.index : Infinity;
+    if (firstBold === Infinity && firstItalic === Infinity) {
+      parts.push(remaining);
+      break;
+    }
+    if (firstBold <= firstItalic) {
+      if (firstBold > 0) parts.push(remaining.slice(0, firstBold));
+      parts.push(<strong key={key++} className="font-semibold text-[#0F3D2E]">{boldMatch[1]}</strong>);
+      remaining = remaining.slice(firstBold + boldMatch[0].length);
+    } else {
+      if (firstItalic > 0) parts.push(remaining.slice(0, firstItalic));
+      parts.push(<em key={key++} className="italic text-[#4A7C59]">{italicMatch[1]}</em>);
+      remaining = remaining.slice(firstItalic + italicMatch[0].length);
+    }
+  }
+  return parts;
+}
+
+// ───────────────────────────────────────────────────────────────
+// Rubric
+// ───────────────────────────────────────────────────────────────
+const RUBRIC_DIMENSIONS = [
+  { key: 'structure',       label: 'Structure',       max: 5 },
+  { key: 'technical_depth', label: 'Technical Depth', max: 5 },
+  { key: 'communication',   label: 'Communication',   max: 5 },
+  { key: 'role_fit',        label: 'Role Fit',        max: 5 },
+  { key: 'red_flags',       label: 'Red Flags',       max: 3, inverse: true },
+];
+
+function RubricBars({ rubric, t }) {
+  if (!rubric) return null;
+  const labelFor = (key) => {
+    if (!t) return RUBRIC_DIMENSIONS.find(d => d.key === key)?.label;
+    return key === 'structure' ? t.dimStructure
+         : key === 'technical_depth' ? t.dimTechnicalDepth
+         : key === 'communication' ? t.dimCommunication
+         : key === 'role_fit' ? t.dimRoleFit
+         : t.dimRedFlags;
+  };
+  return (
+    <div className="mt-3 space-y-1.5">
+      {RUBRIC_DIMENSIONS.map(dim => {
+        const val = rubric[dim.key] ?? 0;
+        const pct = (val / dim.max) * 100;
+        const color = dim.inverse
+          ? (val === 0 ? '#4A7C59' : val === 1 ? '#C8A96B' : '#B85C50')
+          : '#0F3D2E';
+        return (
+          <div key={dim.key} className="flex items-center gap-3">
+            <div className="w-28 text-[11px] uppercase tracking-wider text-[#6B7A72]">{labelFor(dim.key)}</div>
+            <div className="flex-1 h-[3px] bg-[#E8EDE4] rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-500"
+                   style={{ width: `${pct}%`, background: color }} />
+            </div>
+            <div className="w-8 text-right text-[11px] font-mono text-[#0F3D2E]">{val}/{dim.max}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────
+// Welcome message
+// ───────────────────────────────────────────────────────────────
+const getOnboardingWelcome = (profile, language) => {
+  if (profile) {
+    if (language === 'zh') {
+      return `欢迎回来${profile.name ? `，${profile.name}` : ''}。我已经记得你的信息，不用再从头建档。
+
+**进度** ✅ 档案已建立 | ⬜ 简历已审阅 | ⬜ 模拟面试已完成
+
+你可以直接去 **简历** 或 **模拟面试** 模块。如果有什么需要更新的，告诉我。`;
+    }
+    return `Welcome back${profile.name ? `, ${profile.name}` : ''}. I have your profile on file — your info is remembered across sessions.
+
+**Progress** ✅ Profile built | ⬜ Resume reviewed | ⬜ Mock interview completed
+
+You can jump to **Resume** or **Mock Interview** from the sidebar. If anything has changed, tell me what to update.`;
+  }
+  if (language === 'zh') {
+    return `你好，我是你的 AI 求职教练。我会在会话之间记住你的信息。
+
+**进度** ⬜ 档案已建立 | ⬜ 简历已审阅 | ⬜ 模拟面试已完成
+
+让我们一步一步建档，先从最基本的开始。**你叫什么名字？**`;
+  }
+  return `Hi — I'm your AI recruiting coach. I'll remember everything across sessions.
+
+**Progress** ⬜ Profile built | ⬜ Resume reviewed | ⬜ Mock interview completed
+
+Let's build your profile together. A few quick questions, one at a time. First: **what's your name?**`;
+};
+
+// ───────────────────────────────────────────────────────────────
+// Main component
+// ───────────────────────────────────────────────────────────────
+function CoachApp() {
+  const [storageReady, setStorageReady] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [currentModule, setCurrentModule] = useState('onboarding');
+  const [conversations, setConversations] = useState({ onboarding: [], resume: [], interview: [] });
+  const [progress, setProgress] = useState({ profile: false, resume: false, interview: false });
+  const [rubricHistory, setRubricHistory] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+
+  // Language
+  const [language, setLanguage] = useState('en');
+
+  // Resume state
+  const [resumes, setResumes] = useState([]);
+  const [activeResumeId, setActiveResumeId] = useState(null);
+  const [resumeSubmode, setResumeSubmode] = useState(null); // null | 'review' | 'build'
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  // Image attachments (only in resume build mode)
+  const [pendingAttachments, setPendingAttachments] = useState([]);
+
+  // Resume editor
+  const [editingResumeId, setEditingResumeId] = useState(null);
+
+  // Interview state
+  const [targetRole, setTargetRole] = useState('');
+  const [targetCompany, setTargetCompany] = useState('');
+  const [interviewMode, setInterviewMode] = useState('full');
+  const [interviewStarted, setInterviewStarted] = useState(false);
+  const [questionNumber, setQuestionNumber] = useState(0);
+
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+
+  const activeResume = resumes.find(r => r.id === activeResumeId) || null;
+  const editingResume = resumes.find(r => r.id === editingResumeId) || null;
+  const t = getT(language);
+
+  // ── Load
+  useEffect(() => {
+    (async () => {
+      const [p, c, pr, rh, rs, settings] = await Promise.all([
+        loadStorage(STORAGE_KEYS.profile, null),
+        loadStorage(STORAGE_KEYS.conversations, { onboarding: [], resume: [], interview: [] }),
+        loadStorage(STORAGE_KEYS.progress, { profile: false, resume: false, interview: false }),
+        loadStorage(STORAGE_KEYS.rubric, []),
+        loadStorage(STORAGE_KEYS.resumes, []),
+        loadStorage(STORAGE_KEYS.settings, {}),
+      ]);
+      setProfile(p);
+      setConversations(c);
+      setProgress(pr);
+      setRubricHistory(rh);
+      setResumes(rs);
+      if (settings.activeResumeId) setActiveResumeId(settings.activeResumeId);
+      if (settings.targetRole) setTargetRole(settings.targetRole);
+      if (settings.targetCompany) setTargetCompany(settings.targetCompany);
+      if (settings.interviewMode) setInterviewMode(settings.interviewMode);
+      if (settings.language && settings.language !== 'auto') setLanguage(settings.language);
+      if (settings.resumeSubmode) setResumeSubmode(settings.resumeSubmode);
+      setStorageReady(true);
+    })();
+  }, []);
+
+  // ── Save
+  useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.profile, profile); }, [profile, storageReady]);
+  useEffect(() => {
+    if (storageReady) {
+      const sanitized = {
+        onboarding: serializeMessagesForStorage(conversations.onboarding),
+        resume: serializeMessagesForStorage(conversations.resume),
+        interview: serializeMessagesForStorage(conversations.interview),
+      };
+      saveStorage(STORAGE_KEYS.conversations, sanitized);
+    }
+  }, [conversations, storageReady]);
+  useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.progress, progress); }, [progress, storageReady]);
+  useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.rubric, rubricHistory); }, [rubricHistory, storageReady]);
+  useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.resumes, resumes); }, [resumes, storageReady]);
+  useEffect(() => {
+    if (storageReady) saveStorage(STORAGE_KEYS.settings, {
+      activeResumeId, targetRole, targetCompany, interviewMode, language, resumeSubmode,
+    });
+  }, [activeResumeId, targetRole, targetCompany, interviewMode, language, resumeSubmode, storageReady]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversations, currentModule, loading]);
+
+  const currentMessages = conversations[currentModule] || [];
+  const inBuildMode = currentModule === 'resume' && resumeSubmode === 'build';
+
+  // ── Resume file upload
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFile(true);
+    setUploadError(null);
+    try {
+      const text = await extractFileText(file);
+      if (!text || text.length < 20) {
+        throw new Error(t.scannedPdfError);
+      }
+      const newResume = {
+        id: `r_${Date.now()}`,
+        filename: file.name,
+        uploadedAt: new Date().toISOString(),
+        text: text.slice(0, 15000),
+        size: file.size,
+        source: 'upload',
+      };
+      setResumes(prev => [...prev, newResume]);
+      setActiveResumeId(newResume.id);
+    } catch (err) {
+      setUploadError(err.message);
+    } finally {
+      setUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // ── Build-mode attachment (files OR images)
+  const handleBuildFileAttach = async (e) => {
+    const files = Array.from(e.target.files || []);
+    setUploadError(null);
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        if (file.size > 5 * 1024 * 1024) {
+          setUploadError(t.imageTooLarge(file.name));
+          continue;
+        }
+        try {
+          const { base64, mediaType } = await fileToBase64Image(file);
+          setPendingAttachments(prev => [...prev, {
+            id: `att_${Date.now()}_${Math.random()}`,
+            kind: 'image',
+            name: file.name,
+            mediaType,
+            base64,
+          }]);
+        } catch (err) {
+          setUploadError(err.message);
+        }
+      } else {
+        try {
+          const text = await extractFileText(file);
+          if (!text || text.length < 5) throw new Error(t.scannedPdfError);
+          setPendingAttachments(prev => [...prev, {
+            id: `att_${Date.now()}_${Math.random()}`,
+            kind: 'text',
+            name: file.name,
+            text: text.slice(0, 10000),
+          }]);
+        } catch (err) {
+          setUploadError(err.message);
+        }
+      }
+    }
+    if (imageInputRef.current) imageInputRef.current.value = '';
+  };
+
+  // ── Start resume review
+  const startResumeReview = async (resumeId) => {
+    const r = resumes.find(x => x.id === resumeId);
+    if (!r) return;
+    setActiveResumeId(resumeId);
+    setResumeSubmode('review');
+    setConversations(prev => ({ ...prev, resume: [] }));
+    setLoading(true);
+
+    const system = buildSystemPrompt('resume', {
+      profile, progress, activeResume: r, resumeSubmode: 'review', language,
+    });
+    const result = await callClaude({
+      messages: [{ role: 'user', content: 'Please review my resume.' }],
+      system,
+      maxTokens: 3000,
+    });
+    setLoading(false);
+
+    let text = result.raw || (result.error ? `⚠️ ${result.error}` : '(No response)');
+    const reviewed = text.includes('[RESUME_REVIEWED]');
+    if (reviewed) text = text.replace(/\[RESUME_REVIEWED\]/g, '').trim();
+
+    setConversations(prev => ({ ...prev, resume: [{ role: 'assistant', content: text }] }));
+    if (reviewed) setProgress(prev => ({ ...prev, resume: true }));
+  };
+
+  // ── Start resume build
+  const startResumeBuild = async () => {
+    setResumeSubmode('build');
+    // If there's already an in-progress build conversation, resume it — don't wipe
+    if ((conversations.resume || []).length > 0) {
+      return;
+    }
+    setLoading(true);
+
+    const system = buildSystemPrompt('resume', {
+      profile, progress, activeResume: null, resumeSubmode: 'build', language,
+    });
+    const result = await callClaude({
+      messages: [{ role: 'user', content: "I don't have a resume yet. Help me build one." }],
+      system,
+      maxTokens: 1500,
+    });
+    setLoading(false);
+
+    const text = result.raw || (result.error ? `⚠️ ${result.error}` : '(No response)');
+    setConversations(prev => ({ ...prev, resume: [{ role: 'assistant', content: text }] }));
+  };
+
+  // ── Start interview
+  const startInterview = async () => {
+    if (!targetRole.trim() || !targetCompany.trim()) return;
+    setInterviewStarted(true);
+    setQuestionNumber(0);
+    setConversations(prev => ({ ...prev, interview: [] }));
+    setLoading(true);
+
+    const system = buildInterviewResearchPrompt({
+      profile, activeResume, targetRole, targetCompany, interviewMode, language,
+    });
+    const result = await callClaude({
+      messages: [{ role: 'user', content: '[BEGIN_RESEARCH_AND_INTERVIEW]' }],
+      system,
+      useWebSearch: true,
+      maxTokens: 3500,
+    });
+    setLoading(false);
+
+    const text = result.raw || (result.error ? `⚠️ ${result.error}\n\nStarting without research — tell me about yourself.` : 'Tell me about yourself.');
+    setConversations(prev => ({
+      ...prev,
+      interview: [{ role: 'assistant', content: text, isResearch: true }],
+    }));
+    setQuestionNumber(1);
+  };
+
+  // ── Send handler
+  const handleSend = async () => {
+    const text = input.trim();
+    if ((!text && pendingAttachments.length === 0) || loading) return;
+
+    // Build user content — split attachments by kind
+    const imageAtts = pendingAttachments.filter(a => a.kind === 'image');
+    const textAtts  = pendingAttachments.filter(a => a.kind === 'text');
+
+    const textPrefix = textAtts.length > 0
+      ? textAtts.map(a => `--- Attached file: ${a.name} ---\n${a.text}\n--- End of ${a.name} ---`).join('\n\n') + '\n\n'
+      : '';
+    const combinedText = textPrefix + (text || (pendingAttachments.length > 0 ? 'Here are some materials for my resume.' : ''));
+
+    let userContent;
+    if (imageAtts.length > 0) {
+      userContent = [
+        ...imageAtts.map(att => ({
+          type: 'image',
+          source: { type: 'base64', media_type: att.mediaType, data: att.base64 },
+        })),
+        { type: 'text', text: combinedText },
+      ];
+    } else {
+      userContent = combinedText;
+    }
+
+    const userMsg = {
+      role: 'user',
+      content: userContent,
+      displayAttachments: pendingAttachments.length > 0 ? [...pendingAttachments] : undefined,
+    };
+
+    setInput('');
+    setPendingAttachments([]);
+
+    const newMessages = [...currentMessages, userMsg];
+    setConversations(prev => ({ ...prev, [currentModule]: newMessages }));
+    setLoading(true);
+
+    const system = buildSystemPrompt(currentModule, {
+      profile, progress, activeResume,
+      targetRole, targetCompany, interviewMode,
+      questionNumber: currentModule === 'interview' ? questionNumber : 0,
+      resumeSubmode, language,
+    });
+
+    // Convert messages for API — preserve multi-block content
+    const apiMessages = newMessages.map(m => {
+      if (m.isInterview && m.meta) {
+        const parts = [];
+        if (m.meta.feedback) parts.push(`[feedback]: ${m.meta.feedback}`);
+        if (m.meta.nextQuestion) parts.push(`[question]: ${m.meta.nextQuestion}`);
+        return { role: 'assistant', content: parts.join('\n') };
+      }
+      return { role: m.role, content: m.content };
+    });
+
+    const expectJson = currentModule === 'interview';
+    // Enable web_search in build mode so Claude can fetch GitHub/LinkedIn/portfolio links
+    const useWebSearch = inBuildMode;
+    const result = await callClaude({ messages: apiMessages, system, expectJson, maxTokens: 3000, useWebSearch });
+    setLoading(false);
+
+    if (currentModule === 'interview' && result.json) {
+      const { feedback, rubric, next_question, question_type, question_label } = result.json;
+
+      if (questionNumber > 0 && rubric) {
+        setRubricHistory(prev => [...prev, {
+          timestamp: Date.now(),
+          questionNumber,
+          questionType: question_type,
+          questionLabel: question_label,
+          scores: rubric,
+          targetRole,
+          targetCompany,
+        }]);
+      }
+
+      const done = next_question === 'INTERVIEW_COMPLETE';
+      const meta = done
+        ? { feedback, rubric, done: true }
+        : { feedback, rubric, nextQuestion: next_question, questionLabel: question_label, questionType: question_type };
+
+      setConversations(prev => ({
+        ...prev,
+        interview: [...prev.interview, { role: 'assistant', content: '', meta, isInterview: true }],
+      }));
+
+      if (done) setProgress(prev => ({ ...prev, interview: true }));
+      else setQuestionNumber(prev => prev + 1);
+    } else {
+      let responseText = result.raw || (result.error ? `⚠️ ${result.error}` : '(No response)');
+      let profileComplete = null;
+      let resumeDraft = null;
+
+      const profileMatch = responseText.match(/\[PROFILE_COMPLETE\]\s*(\{[\s\S]*?\})/);
+      if (profileMatch) {
+        try {
+          profileComplete = JSON.parse(profileMatch[1]);
+          responseText = responseText.replace(/\[PROFILE_COMPLETE\][\s\S]*?\}/, '').trim();
+        } catch {}
+      }
+
+      const draftMatch = responseText.match(/\[RESUME_DRAFT_START\]([\s\S]*?)\[RESUME_DRAFT_END\]/);
+      if (draftMatch) {
+        resumeDraft = draftMatch[1].trim();
+      }
+
+      // New structured JSON format
+      let resumeStructured = null;
+      const jsonMatch = responseText.match(/\[RESUME_JSON_START\]([\s\S]*?)\[RESUME_JSON_END\]/);
+      if (jsonMatch) {
+        try {
+          resumeStructured = JSON.parse(jsonMatch[1].trim());
+        } catch (e) {
+          console.error('Failed to parse RESUME_JSON:', e);
+        }
+      }
+
+      const resumeReviewed = responseText.includes('[RESUME_REVIEWED]');
+      responseText = responseText
+        .replace(/\[RESUME_REVIEWED\]/g, '')
+        .replace(/\[RESUME_DRAFT_START\][\s\S]*?\[RESUME_DRAFT_END\]/g, '')
+        .replace(/\[RESUME_JSON_START\][\s\S]*?\[RESUME_JSON_END\]/g, '')
+        .trim();
+
+      setConversations(prev => ({
+        ...prev,
+        [currentModule]: [...prev[currentModule], { role: 'assistant', content: responseText }],
+      }));
+
+      if (profileComplete) {
+        setProfile(profileComplete);
+        setProgress(prev => ({ ...prev, profile: true }));
+      }
+      if (resumeStructured) {
+        const name = resumeStructured.header?.name || 'draft';
+        const newResume = {
+          id: `r_${Date.now()}`,
+          filename: `${name}-${new Date().toISOString().slice(0, 10)}.resume`,
+          uploadedAt: new Date().toISOString(),
+          text: structuredToPlainText(resumeStructured),
+          structured: resumeStructured,
+          size: 0,
+          source: 'built',
+        };
+        setResumes(prev => [...prev, newResume]);
+        setActiveResumeId(newResume.id);
+        setTimeout(() => setEditingResumeId(newResume.id), 600);
+      } else if (resumeDraft) {
+        // Legacy markdown fallback
+        const newResume = {
+          id: `r_${Date.now()}`,
+          filename: `draft-${new Date().toISOString().slice(0, 10)}.md`,
+          uploadedAt: new Date().toISOString(),
+          text: resumeDraft,
+          size: resumeDraft.length,
+          source: 'built',
+        };
+        setResumes(prev => [...prev, newResume]);
+        setActiveResumeId(newResume.id);
+        setTimeout(() => setEditingResumeId(newResume.id), 600);
+      }
+      if (resumeReviewed) {
+        setProgress(prev => ({ ...prev, resume: true }));
+      }
+    }
+  };
+
+  // ── Save edited resume (text or structured)
+  const saveEditedResume = (id, update) => {
+    setResumes(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const patch = { updatedAt: new Date().toISOString() };
+      if (typeof update === 'string') {
+        patch.text = update;
+      } else if (update && typeof update === 'object') {
+        patch.structured = update;
+        patch.text = structuredToPlainText(update);
+      }
+      return { ...r, ...patch };
+    }));
+  };
+
+  // ── Delete / reset
+  const deleteResume = (id) => {
+    if (!confirm(t.confirmDeleteResume)) return;
+    setResumes(prev => prev.filter(r => r.id !== id));
+    if (activeResumeId === id) setActiveResumeId(null);
+    if (editingResumeId === id) setEditingResumeId(null);
+  };
+  const resetResumeModule = () => {
+    setResumeSubmode(null);
+    setConversations(prev => ({ ...prev, resume: [] }));
+    setPendingAttachments([]);
+  };
+  const resetInterviewModule = () => {
+    setInterviewStarted(false);
+    setQuestionNumber(0);
+    setConversations(prev => ({ ...prev, interview: [] }));
+  };
+
+  const handleClearAll = async () => {
+    if (!confirm(t.confirmClearAll)) return;
+    await clearAllStorage();
+    setProfile(null);
+    setConversations({ onboarding: [], resume: [], interview: [] });
+    setProgress({ profile: false, resume: false, interview: false });
+    setRubricHistory([]);
+    setResumes([]);
+    setActiveResumeId(null);
+    setEditingResumeId(null);
+    setResumeSubmode(null);
+    setTargetRole('');
+    setTargetCompany('');
+    setInterviewStarted(false);
+    setQuestionNumber(0);
+    setShowMemory(false);
+    setCurrentModule('onboarding');
+  };
+
+  // ───────────────────────────────────────────────────────────
+  // Render
+  // ───────────────────────────────────────────────────────────
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap');
+        :root {
+          --bg: #FBFAF7;
+          --bg-sunk: #F5F3EE;
+          --paper: #FFFFFF;
+          --ink: #1A2420;
+          --ink-soft: #4A5550;
+          --ink-mute: #8A9590;
+          --forest: #0F3D2E;
+          --sage: #4A7C59;
+          --mint: #E8EDE4;
+          --line: rgba(15, 61, 46, 0.12);
+          --line-soft: rgba(15, 61, 46, 0.06);
+          --danger: #B85C50;
+          --warn-bg: #FFF6E8;
+          --warn-border: #E8D6A8;
+          --warn-text: #5C4820;
+        }
+        html, body, #root { background: var(--bg); }
+        .font-display { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
+        .font-body    { font-family: 'Geist', system-ui, sans-serif; }
+        .font-mono    { font-family: 'Geist Mono', ui-monospace, monospace; }
+        .eyebrow      { font-family: 'Geist', sans-serif; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mute); font-weight: 500; }
+        textarea, input, select { font-family: 'Geist', system-ui, sans-serif; }
+        textarea:focus, input:focus, select:focus { outline: none; border-color: var(--forest) !important; }
+        .chat-scroll::-webkit-scrollbar { width: 6px; }
+        .chat-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .dots span { display: inline-block; width: 4px; height: 4px; margin: 0 1px; border-radius: 50%; background: var(--sage); animation: dot 1.2s infinite ease-in-out; }
+        .dots span:nth-child(2) { animation-delay: 0.15s; }
+        .dots span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes dot { 0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
+      `}</style>
+
+      <div className="font-body h-screen flex text-[var(--ink)]" style={{ background: 'var(--bg)' }}>
+        {/* ═══════ SIDEBAR ═══════ */}
+        <aside className="w-[280px] flex-shrink-0 flex flex-col" style={{ background: 'var(--bg-sunk)', borderRight: '1px solid var(--line-soft)' }}>
+          <div className="px-7 pt-8 pb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ background: 'var(--forest)' }} />
+              <div className="eyebrow">{t.estLabel}</div>
+            </div>
+            <h1 className="font-display text-[28px] leading-none mt-3" style={{ color: 'var(--forest)' }}>
+              Coach<span className="italic" style={{ color: 'var(--sage)' }}>.</span>
+            </h1>
+            <div className="text-[12px] mt-1.5" style={{ color: 'var(--ink-soft)' }}>
+              {t.brandTagline}
+            </div>
+          </div>
+
+          <div className="h-px mx-7" style={{ background: 'var(--line-soft)' }} />
+
+          <div className="px-7 py-6">
+            <div className="eyebrow mb-4">{t.progress}</div>
+            <div className="space-y-3">
+              {PROGRESS_STEPS.map(step => {
+                const done = progress[step.key];
+                const label = step.key === 'profile' ? t.stepProfile
+                            : step.key === 'resume' ? t.stepResume
+                            : t.stepInterview;
+                return (
+                  <div key={step.key} className="flex items-center gap-3">
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+                         style={{
+                           background: done ? 'var(--forest)' : 'transparent',
+                           border: done ? 'none' : '1px solid var(--line)',
+                         }}>
+                      {done && <Check size={10} strokeWidth={3} color="white" />}
+                    </div>
+                    <div className={`text-[13px] ${done ? 'text-[var(--ink)]' : 'text-[var(--ink-mute)]'}`}>
+                      {label}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="h-px mx-7" style={{ background: 'var(--line-soft)' }} />
+
+          <div className="px-7 py-6 flex-1">
+            <div className="eyebrow mb-4">{t.modules}</div>
+            <nav className="space-y-1">
+              {MODULES.map(m => {
+                const Icon = m.icon;
+                const active = currentModule === m.id;
+                const label = m.id === 'onboarding' ? t.moduleOnboarding
+                            : m.id === 'resume' ? t.moduleResume
+                            : m.id === 'interview' ? t.moduleInterview
+                            : t.moduleDashboard;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setCurrentModule(m.id)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-all"
+                    style={{
+                      background: active ? 'var(--paper)' : 'transparent',
+                      boxShadow: active ? '0 1px 2px rgba(15,61,46,0.04), 0 0 0 1px var(--line-soft)' : 'none',
+                      color: active ? 'var(--forest)' : 'var(--ink-soft)',
+                    }}
+                  >
+                    <Icon size={15} strokeWidth={active ? 2.25 : 1.75} />
+                    <span className="text-[13px]" style={{ fontWeight: active ? 500 : 400 }}>{label}</span>
+                    {active && <ArrowRight size={12} className="ml-auto" />}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="px-7">
+            <div className="h-px" style={{ background: 'var(--line-soft)' }} />
+          </div>
+
+          {/* Language toggle */}
+          <div className="px-7 py-5">
+            <div className="eyebrow mb-2.5">{t.language}</div>
+            <div className="flex gap-1 p-1 rounded-md"
+                 style={{ background: 'var(--paper)', border: '1px solid var(--line-soft)' }}>
+              {LANGUAGES.map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setLanguage(opt.id)}
+                  className="flex-1 py-1.5 rounded text-[11px] font-medium transition-all"
+                  style={{
+                    background: language === opt.id ? 'var(--forest)' : 'transparent',
+                    color: language === opt.id ? 'white' : 'var(--ink-soft)',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="px-7 pb-7">
+            <button
+              onClick={() => setShowMemory(true)}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-md border transition-colors hover:bg-[var(--paper)]"
+              style={{ borderColor: 'var(--line-soft)' }}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles size={13} color="var(--sage)" />
+                <span className="text-[12px] text-[var(--ink-soft)]">{t.whatIRemember}</span>
+              </div>
+              <ArrowRight size={11} color="var(--ink-mute)" />
+            </button>
+          </div>
+        </aside>
+
+        {/* ═══════ MAIN ═══════ */}
+        <main className="flex-1 flex flex-col min-w-0">
+          <header className="px-12 pt-10 pb-6" style={{ borderBottom: '1px solid var(--line-soft)' }}>
+            <div className="eyebrow">
+              {t.moduleCounter(MODULES.findIndex(m => m.id === currentModule) + 1, MODULES.length)}
+            </div>
+            <div className="flex items-baseline justify-between mt-2">
+              <h2 className="font-display text-[36px] leading-none" style={{ color: 'var(--forest)' }}>
+                {currentModule === 'onboarding' ? t.moduleOnboarding
+                 : currentModule === 'resume' ? t.moduleResume
+                 : currentModule === 'interview' ? t.moduleInterview
+                 : t.moduleDashboard}
+              </h2>
+              <div className="flex items-center gap-3">
+                {currentModule === 'resume' && resumeSubmode && (
+                  <button onClick={resetResumeModule}
+                          className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[var(--ink-mute)] hover:text-[var(--forest)]">
+                    <RefreshCw size={11} /> {t.backToLibrary}
+                  </button>
+                )}
+                {currentModule === 'interview' && interviewStarted && (
+                  <button onClick={resetInterviewModule}
+                          className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[var(--ink-mute)] hover:text-[var(--forest)]">
+                    <RefreshCw size={11} /> {t.reset}
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-[13px] mt-2 max-w-2xl" style={{ color: 'var(--ink-soft)' }}>
+              {currentModule === 'onboarding' && t.onboardingSub}
+              {currentModule === 'resume'     && t.resumeSub}
+              {currentModule === 'interview'  && t.interviewSub}
+              {currentModule === 'dashboard'  && t.dashboardSub}
+            </p>
+          </header>
+
+          <div className="flex-1 overflow-y-auto chat-scroll">
+            <div className="max-w-3xl mx-auto px-12 py-8">
+
+              {currentModule === 'resume' && !resumeSubmode && (
+                <ResumeLibrary
+                  t={t}
+                  resumes={resumes}
+                  activeResumeId={activeResumeId}
+                  setActiveResumeId={setActiveResumeId}
+                  startResumeReview={startResumeReview}
+                  startResumeBuild={startResumeBuild}
+                  deleteResume={deleteResume}
+                  openEditor={(id) => setEditingResumeId(id)}
+                  fileInputRef={fileInputRef}
+                  handleFileUpload={handleFileUpload}
+                  uploadingFile={uploadingFile}
+                  uploadError={uploadError}
+                />
+              )}
+
+              {currentModule === 'interview' && !interviewStarted && (
+                <InterviewSetup
+                  t={t}
+                  targetRole={targetRole}
+                  setTargetRole={setTargetRole}
+                  targetCompany={targetCompany}
+                  setTargetCompany={setTargetCompany}
+                  interviewMode={interviewMode}
+                  setInterviewMode={setInterviewMode}
+                  resumes={resumes}
+                  activeResumeId={activeResumeId}
+                  setActiveResumeId={setActiveResumeId}
+                  startInterview={startInterview}
+                  loading={loading}
+                  setCurrentModule={setCurrentModule}
+                />
+              )}
+
+              {currentModule === 'dashboard' && (
+                <Dashboard t={t} profile={profile} progress={progress} rubricHistory={rubricHistory} resumes={resumes} />
+              )}
+
+              {(currentModule === 'onboarding'
+                || (currentModule === 'resume' && resumeSubmode)
+                || (currentModule === 'interview' && interviewStarted)) && (
+                <div className="space-y-6">
+                  {currentMessages.length === 0 && !loading && currentModule === 'onboarding' && (
+                    <MessageBubble role="assistant">
+                      {renderMarkdown(getOnboardingWelcome(profile, language))}
+                    </MessageBubble>
+                  )}
+
+                  {currentMessages.map((msg, idx) => (
+                    <MessageBubble key={idx} role={msg.role} attachments={msg.displayAttachments}>
+                      {msg.isInterview ? (
+                        <InterviewMessage t={t} meta={msg.meta} />
+                      ) : msg.isResearch ? (
+                        <div>
+                          <div className="eyebrow mb-2" style={{ color: 'var(--sage)' }}>{t.researchFirstQ}</div>
+                          {renderMarkdown(msg.content)}
+                        </div>
+                      ) : (
+                        renderMarkdown(typeof msg.content === 'string' ? msg.content : extractTextContent(msg.content))
+                      )}
+                    </MessageBubble>
+                  ))}
+
+                  {loading && (
+                    <MessageBubble role="assistant">
+                      <div className="dots py-1"><span /><span /><span /></div>
+                    </MessageBubble>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* INPUT */}
+          {(currentModule === 'onboarding'
+            || (currentModule === 'resume' && resumeSubmode)
+            || (currentModule === 'interview' && interviewStarted)) && (
+            <div className="px-12 py-6" style={{ borderTop: '1px solid var(--line-soft)', background: 'var(--bg)' }}>
+              <div className="max-w-3xl mx-auto">
+                {/* Attachment chips */}
+                {pendingAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {pendingAttachments.map(att => (
+                      <div key={att.id} className="flex items-center gap-2 px-2 py-1 rounded-md border"
+                           style={{ borderColor: 'var(--line)', background: 'var(--paper)' }}>
+                        {att.kind === 'image' ? (
+                          <img src={`data:${att.mediaType};base64,${att.base64}`}
+                               alt={att.name}
+                               className="w-8 h-8 object-cover rounded" />
+                        ) : (
+                          <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0"
+                               style={{ background: 'var(--mint)' }}>
+                            <FileText size={12} color="var(--forest)" />
+                          </div>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[11px] max-w-[160px] truncate" style={{ color: 'var(--ink)' }}>
+                            {att.name}
+                          </span>
+                          {att.kind === 'text' && (
+                            <span className="text-[9px]" style={{ color: 'var(--ink-mute)' }}>
+                              {(att.text.length / 1000).toFixed(1)}k chars
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setPendingAttachments(prev => prev.filter(a => a.id !== att.id))}
+                          className="text-[var(--ink-mute)] hover:text-[var(--danger)]"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-end gap-3 p-3 rounded-lg border"
+                     style={{ background: 'var(--paper)', borderColor: 'var(--line)' }}>
+                  {inBuildMode && (
+                    <>
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.txt,.md"
+                        multiple
+                        onChange={handleBuildFileAttach}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => imageInputRef.current?.click()}
+                        className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 text-[var(--ink-mute)] hover:text-[var(--forest)] hover:bg-[var(--mint)]"
+                        title={t.attachFiles}
+                      >
+                        <Paperclip size={14} />
+                      </button>
+                    </>
+                  )}
+                  <textarea
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder={
+                      currentModule === 'onboarding' ? t.typeAnswer :
+                      inBuildMode ? t.buildPlaceholder :
+                      currentModule === 'resume' ? t.askFollowup :
+                      t.typeAnswer
+                    }
+                    rows={1}
+                    disabled={loading}
+                    className="flex-1 resize-none bg-transparent text-[14px] leading-relaxed max-h-40 focus:outline-none disabled:opacity-50"
+                    style={{ color: 'var(--ink)' }}
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={(!input.trim() && pendingAttachments.length === 0) || loading}
+                    className="w-9 h-9 rounded-md flex items-center justify-center transition-all disabled:opacity-30 flex-shrink-0"
+                    style={{ background: 'var(--forest)', color: 'white' }}
+                  >
+                    {loading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  </button>
+                </div>
+                <div className="text-[10px] mt-2 text-center" style={{ color: 'var(--ink-mute)' }}>
+                  {inBuildMode ? t.inputHintBuild : t.inputHint}
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+
+        {showMemory && (
+          <MemoryModal
+            t={t}
+            profile={profile}
+            resumes={resumes}
+            onClose={() => setShowMemory(false)}
+            onClearAll={handleClearAll}
+          />
+        )}
+
+        {editingResume && (
+          editingResume.structured ? (
+            <StructuredResumeEditor
+              key={editingResume.id}
+              t={t}
+              resume={editingResume}
+              onClose={() => setEditingResumeId(null)}
+              onSave={(update) => saveEditedResume(editingResume.id, update)}
+              profile={profile}
+              language={language}
+            />
+          ) : (
+            <ResumeEditor
+              key={editingResume.id}
+              t={t}
+              resume={editingResume}
+              onClose={() => setEditingResumeId(null)}
+              onSave={(newText) => saveEditedResume(editingResume.id, newText)}
+              profile={profile}
+              language={language}
+              onUpgradeToStructured={async () => {
+                const structured = await parseResumeTextToStructured(editingResume.text, language);
+                if (structured) {
+                  saveEditedResume(editingResume.id, structured);
+                }
+              }}
+            />
+          )
+        )}
+      </div>
+    </>
+  );
+}
+
+// Helper: extract plain text from possibly-array content (for display fallback)
+function extractTextContent(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+  }
+  return '';
+}
+
+// ───────────────────────────────────────────────────────────────
+// Message bubble
+// ───────────────────────────────────────────────────────────────
+function MessageBubble({ role, children, attachments }) {
+  if (role === 'user') {
+    const imageAtts = attachments?.filter(a => a.kind === 'image') || [];
+    const textAtts  = attachments?.filter(a => a.kind === 'text')  || [];
+    return (
+      <div className="flex justify-end fade-in">
+        <div className="max-w-[78%] flex flex-col items-end gap-2">
+          {imageAtts.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-end">
+              {imageAtts.map(att => (
+                <img
+                  key={att.id}
+                  src={`data:${att.mediaType};base64,${att.base64}`}
+                  alt={att.name}
+                  className="max-h-32 max-w-[180px] rounded-lg object-cover"
+                  style={{ border: '1px solid var(--line)' }}
+                />
+              ))}
+            </div>
+          )}
+          {textAtts.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-end">
+              {textAtts.map(att => (
+                <div key={att.id}
+                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-md"
+                     style={{ background: 'var(--mint)', border: '1px solid var(--line)' }}>
+                  <FileText size={11} color="var(--forest)" />
+                  <span className="text-[11px]" style={{ color: 'var(--forest)' }}>{att.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="px-5 py-3 rounded-2xl rounded-tr-sm text-[14px] leading-relaxed whitespace-pre-wrap"
+               style={{ background: 'var(--forest)', color: 'white' }}>
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex gap-4 fade-in">
+      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+           style={{ background: 'var(--mint)' }}>
+        <Sparkles size={12} color="var(--forest)" />
+      </div>
+      <div className="flex-1 min-w-0 pt-0.5" style={{ color: 'var(--ink)' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function InterviewMessage({ t, meta }) {
+  if (meta.done) {
+    return (
+      <div>
+        <div className="eyebrow mb-2" style={{ color: 'var(--sage)' }}>{t.interviewComplete}</div>
+        <div className="text-[14.5px] leading-relaxed">{renderMarkdown(meta.feedback)}</div>
+        {meta.rubric && <RubricBars t={t} rubric={meta.rubric} />}
+        <div className="mt-5 p-4 rounded-md flex items-center gap-3" style={{ background: 'var(--mint)' }}>
+          <Check size={14} color="var(--forest)" />
+          <div className="text-[12px]" style={{ color: 'var(--forest)' }}>
+            {t.rubricSaved} <strong>{t.rubricSavedProgress}</strong>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      {meta.feedback && (
+        <div>
+          <div className="eyebrow mb-2">{t.feedbackLabel}</div>
+          <div className="text-[14px] leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+            {renderMarkdown(meta.feedback)}
+          </div>
+          {meta.rubric && <RubricBars t={t} rubric={meta.rubric} />}
+        </div>
+      )}
+      {meta.nextQuestion && (
+        <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--line-soft)' }}>
+          {meta.questionLabel && (
+            <div className="eyebrow mb-2" style={{ color: 'var(--sage)' }}>{meta.questionLabel}</div>
+          )}
+          <div className="font-display text-[18px] leading-snug" style={{ color: 'var(--forest)' }}>
+            {meta.nextQuestion}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────
+// Resume library
+// ───────────────────────────────────────────────────────────────
+function ResumeLibrary({
+  t,
+  resumes, activeResumeId, setActiveResumeId,
+  startResumeReview, startResumeBuild, deleteResume, openEditor,
+  fileInputRef, handleFileUpload, uploadingFile, uploadError,
+}) {
+  return (
+    <div className="space-y-8">
+      <section>
+        <div className="eyebrow mb-3">{t.yourLibrary}</div>
+        <div className="p-8 rounded-lg border-2 border-dashed flex flex-col items-center text-center"
+             style={{ borderColor: 'var(--line)', background: 'var(--paper)' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
+               style={{ background: 'var(--mint)' }}>
+            {uploadingFile
+              ? <Loader2 size={20} color="var(--forest)" className="animate-spin" />
+              : <FileUp size={20} color="var(--forest)" />}
+          </div>
+          <div className="font-display text-[18px]" style={{ color: 'var(--forest)' }}>
+            {uploadingFile ? t.extracting : t.uploadResume}
+          </div>
+          <div className="text-[12px] mt-1" style={{ color: 'var(--ink-mute)' }}>
+            {t.fileTypes}
+          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingFile}
+            className="mt-4 px-5 py-2.5 rounded-md text-[13px] font-medium transition-all disabled:opacity-50"
+            style={{ background: 'var(--forest)', color: 'white' }}
+          >
+            {t.chooseFile}
+          </button>
+          {uploadError && (
+            <div className="mt-3 flex items-center gap-2 text-[12px]" style={{ color: 'var(--danger)' }}>
+              <AlertCircle size={12} /> {uploadError}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {resumes.length > 0 && (
+        <section>
+          <div className="eyebrow mb-3">{t.onFile(resumes.length)}</div>
+          <div className="space-y-3">
+            {resumes.map(r => (
+              <div
+                key={r.id}
+                className="p-5 rounded-lg border transition-all"
+                style={{
+                  background: 'var(--paper)',
+                  borderColor: activeResumeId === r.id ? 'var(--forest)' : 'var(--line-soft)',
+                  boxShadow: activeResumeId === r.id ? '0 0 0 1px var(--forest)' : 'none',
+                }}
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0"
+                       style={{ background: 'var(--mint)' }}>
+                    <FileText size={16} color="var(--forest)" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="font-display text-[16px] truncate" style={{ color: 'var(--forest)' }}>
+                        {r.filename}
+                      </div>
+                      {activeResumeId === r.id && (
+                        <div className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono"
+                             style={{ background: 'var(--mint)', color: 'var(--forest)' }}>
+                          <Star size={8} /> {t.active}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[11px] mt-1 flex gap-3" style={{ color: 'var(--ink-mute)' }}>
+                      <span>{t.added} {new Date(r.uploadedAt).toLocaleDateString()}</span>
+                      <span>·</span>
+                      <span>{(r.text.length / 1000).toFixed(1)}k {t.chars}</span>
+                      <span>·</span>
+                      <span>{r.source === 'built' ? t.builtInApp : t.uploaded}</span>
+                    </div>
+                    <div className="text-[12px] mt-2 line-clamp-2" style={{ color: 'var(--ink-soft)' }}>
+                      {r.text.slice(0, 180)}…
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <button
+                        onClick={() => openEditor(r.id)}
+                        className="px-3 py-1.5 rounded-md text-[11px] font-medium flex items-center gap-1.5"
+                        style={{ background: 'var(--forest)', color: 'white' }}
+                      >
+                        <Edit3 size={11} /> {t.edit}
+                      </button>
+                      <button
+                        onClick={() => startResumeReview(r.id)}
+                        className="px-3 py-1.5 rounded-md text-[11px] font-medium border"
+                        style={{ borderColor: 'var(--forest)', color: 'var(--forest)' }}
+                      >
+                        {t.review}
+                      </button>
+                      {activeResumeId !== r.id && (
+                        <button
+                          onClick={() => setActiveResumeId(r.id)}
+                          className="px-3 py-1.5 rounded-md text-[11px] border"
+                          style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}
+                        >
+                          {t.setActive}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteResume(r.id)}
+                        className="ml-auto w-7 h-7 rounded-md flex items-center justify-center text-[var(--ink-mute)] hover:text-[var(--danger)]"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <div className="eyebrow mb-3">{t.noResumeYet}</div>
+        <div className="p-5 rounded-lg border flex items-center justify-between"
+             style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+          <div>
+            <div className="font-display text-[16px]" style={{ color: 'var(--forest)' }}>
+              {t.buildFromScratch}
+            </div>
+            <div className="text-[12px] mt-1" style={{ color: 'var(--ink-soft)' }}>
+              {t.buildDesc}
+            </div>
+          </div>
+          <button
+            onClick={startResumeBuild}
+            className="px-4 py-2 rounded-md text-[12px] font-medium flex items-center gap-1.5 flex-shrink-0"
+            style={{ background: 'transparent', color: 'var(--forest)', border: '1px solid var(--forest)' }}
+          >
+            <Plus size={12} /> {t.startBuilding}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────
+// Interview setup
+// ───────────────────────────────────────────────────────────────
+function InterviewSetup({
+  t,
+  targetRole, setTargetRole, targetCompany, setTargetCompany,
+  interviewMode, setInterviewMode, resumes, activeResumeId, setActiveResumeId,
+  startInterview, loading, setCurrentModule,
+}) {
+  return (
+    <div className="p-8 rounded-lg border" style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+      <div className="eyebrow mb-4">{t.setup}</div>
+
+      <div className="mb-5">
+        <label className="block text-[13px] font-medium mb-2">{t.activeResumeLabel}</label>
+        {resumes.length === 0 ? (
+          <div className="p-4 rounded-md flex items-start gap-3"
+               style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn-border)' }}>
+            <AlertCircle size={14} color="#8A6B2E" className="flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="text-[12px]" style={{ color: 'var(--warn-text)' }}>
+                {t.noResumeWarning}
+              </div>
+              <button
+                onClick={() => setCurrentModule('resume')}
+                className="mt-2 text-[12px] font-medium underline"
+                style={{ color: 'var(--forest)' }}
+              >
+                {t.goToResume}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <select
+            value={activeResumeId || ''}
+            onChange={e => setActiveResumeId(e.target.value || null)}
+            className="w-full px-4 py-3 rounded-md text-[13.5px] border bg-white"
+            style={{ borderColor: 'var(--line)' }}
+          >
+            <option value="">{t.noneUseProfile}</option>
+            {resumes.map(r => (
+              <option key={r.id} value={r.id}>{r.filename}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        <div>
+          <label className="block text-[13px] font-medium mb-2">{t.targetRole}</label>
+          <input
+            value={targetRole}
+            onChange={e => setTargetRole(e.target.value)}
+            placeholder={t.targetRolePlaceholder}
+            className="w-full px-4 py-3 rounded-md text-[13.5px] border"
+            style={{ background: 'var(--paper)', borderColor: 'var(--line)' }}
+          />
+        </div>
+        <div>
+          <label className="block text-[13px] font-medium mb-2">{t.targetCompany}</label>
+          <input
+            value={targetCompany}
+            onChange={e => setTargetCompany(e.target.value)}
+            placeholder={t.targetCompanyPlaceholder}
+            className="w-full px-4 py-3 rounded-md text-[13.5px] border"
+            style={{ background: 'var(--paper)', borderColor: 'var(--line)' }}
+          />
+        </div>
+      </div>
+
+      <div className="mb-5">
+        <label className="block text-[13px] font-medium mb-2">{t.length}</label>
+        <div className="flex gap-2">
+          {[
+            { id: 'lite', label: t.lite, sub: t.liteSub },
+            { id: 'full', label: t.full, sub: t.fullSub },
+          ].map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setInterviewMode(opt.id)}
+              className="flex-1 px-4 py-3 rounded-md text-left border transition-all"
+              style={{
+                background: interviewMode === opt.id ? 'var(--mint)' : 'var(--paper)',
+                borderColor: interviewMode === opt.id ? 'var(--forest)' : 'var(--line)',
+              }}
+            >
+              <div className="text-[13px] font-medium" style={{ color: 'var(--forest)' }}>{opt.label}</div>
+              <div className="text-[11px]" style={{ color: 'var(--ink-mute)' }}>{opt.sub}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="text-[11px] mb-4 p-3 rounded-md" style={{ background: 'var(--mint)', color: 'var(--forest)' }}>
+        {t.researchBanner(targetRole, targetCompany)}
+      </div>
+
+      <button
+        onClick={startInterview}
+        disabled={!targetRole.trim() || !targetCompany.trim() || loading}
+        className="px-6 py-3 rounded-md text-[13px] font-medium transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+        style={{ background: 'var(--forest)', color: 'white' }}
+      >
+        {loading ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+        {t.startInterview}
+      </button>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────
+// Dashboard
+// ───────────────────────────────────────────────────────────────
+function Dashboard({ t, profile, progress, rubricHistory, resumes }) {
+  const completedCount = Object.values(progress).filter(Boolean).length;
+  const totalSteps = Object.keys(progress).length;
+
+  const chartData = rubricHistory.map((r, i) => ({
+    n: i + 1,
+    structure: r.scores.structure,
+    technical: r.scores.technical_depth,
+    communication: r.scores.communication,
+    role_fit: r.scores.role_fit,
+  }));
+
+  const latestRadar = rubricHistory.length > 0
+    ? [
+        { dim: t.dimStructure,       value: rubricHistory[rubricHistory.length - 1].scores.structure       || 0 },
+        { dim: t.dimTechnicalDepth,  value: rubricHistory[rubricHistory.length - 1].scores.technical_depth || 0 },
+        { dim: t.dimCommunication,   value: rubricHistory[rubricHistory.length - 1].scores.communication   || 0 },
+        { dim: t.dimRoleFit,         value: rubricHistory[rubricHistory.length - 1].scores.role_fit        || 0 },
+      ]
+    : null;
+
+  return (
+    <div className="space-y-10">
+      <div className="grid grid-cols-3 gap-6">
+        <StatCard label={t.statProgress} value={`${completedCount} / ${totalSteps}`} sub={t.statProgressSub} />
+        <StatCard label={t.statResumes} value={resumes.length} sub={t.statResumesSub} />
+        <StatCard label={t.statAnswers} value={rubricHistory.length} sub={t.statAnswersSub} />
+      </div>
+
+      {profile && (
+        <section>
+          <div className="eyebrow mb-4">{t.profileHeading}</div>
+          <div className="p-6 rounded-lg border" style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+              {Object.entries(profile).map(([k, v]) => (
+                <div key={k}>
+                  <div className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--ink-mute)' }}>
+                    {k.replace(/_/g, ' ')}
+                  </div>
+                  <div className="text-[13px] mt-0.5" style={{ color: 'var(--ink)' }}>{v || '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {chartData.length > 0 && (
+        <section>
+          <div className="eyebrow mb-4">{t.rubricTrend}</div>
+          <div className="p-6 rounded-lg border" style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+            <div style={{ width: '100%', height: 240 }}>
+              <ResponsiveContainer>
+                <LineChart data={chartData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="n" stroke="#8A9590" fontSize={11} />
+                  <YAxis domain={[0, 5]} stroke="#8A9590" fontSize={11} />
+                  <Tooltip contentStyle={{ background: '#FFFFFF', border: '1px solid rgba(15,61,46,0.12)', borderRadius: 6, fontSize: 12, fontFamily: 'Geist' }} />
+                  <Line type="monotone" dataKey="structure"     stroke="#0F3D2E" strokeWidth={1.5} dot={{ r: 2.5 }} />
+                  <Line type="monotone" dataKey="technical"     stroke="#4A7C59" strokeWidth={1.5} dot={{ r: 2.5 }} />
+                  <Line type="monotone" dataKey="communication" stroke="#8AAF8F" strokeWidth={1.5} dot={{ r: 2.5 }} />
+                  <Line type="monotone" dataKey="role_fit"      stroke="#C8A96B" strokeWidth={1.5} dot={{ r: 2.5 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex gap-6 mt-3 flex-wrap">
+              {[
+                { c: '#0F3D2E', label: t.legendStructure     },
+                { c: '#4A7C59', label: t.legendTechnical     },
+                { c: '#8AAF8F', label: t.legendCommunication },
+                { c: '#C8A96B', label: t.legendRoleFit       },
+              ].map(l => (
+                <div key={l.label} className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--ink-soft)' }}>
+                  <div className="w-2 h-2 rounded-full" style={{ background: l.c }} />
+                  {l.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {latestRadar && (
+        <section>
+          <div className="eyebrow mb-4">{t.latestSnapshot}</div>
+          <div className="p-6 rounded-lg border" style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+            <div style={{ width: '100%', height: 260 }}>
+              <ResponsiveContainer>
+                <RadarChart data={latestRadar}>
+                  <PolarGrid stroke="rgba(15,61,46,0.1)" />
+                  <PolarAngleAxis dataKey="dim" tick={{ fontSize: 11, fill: '#4A5550' }} />
+                  <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10, fill: '#8A9590' }} />
+                  <Radar dataKey="value" stroke="#0F3D2E" fill="#0F3D2E" fillOpacity={0.15} strokeWidth={1.5} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {rubricHistory.length === 0 && !profile && resumes.length === 0 && (
+        <div className="py-16 text-center">
+          <div className="text-[14px]" style={{ color: 'var(--ink-mute)' }}>
+            {t.emptyDashboard}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub }) {
+  return (
+    <div className="p-5 rounded-lg border" style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+      <div className="eyebrow">{label}</div>
+      <div className="font-display text-[32px] leading-none mt-2" style={{ color: 'var(--forest)' }}>{value}</div>
+      {sub && <div className="text-[11px] mt-1.5" style={{ color: 'var(--ink-mute)' }}>{sub}</div>}
+    </div>
+  );
+}
+
+function MemoryModal({ t, profile, resumes, onClose, onClearAll }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
+         style={{ background: 'rgba(26, 36, 32, 0.4)' }}
+         onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+           className="max-w-xl w-full rounded-xl p-8 fade-in max-h-[85vh] overflow-y-auto"
+           style={{ background: 'var(--paper)', boxShadow: '0 20px 60px rgba(15,61,46,0.2)' }}>
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <div className="eyebrow">{t.persistentMemory}</div>
+            <h3 className="font-display text-[24px] mt-1" style={{ color: 'var(--forest)' }}>
+              {t.memoryTitle}
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-[var(--ink-mute)] hover:text-[var(--ink)]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="eyebrow mb-3">{t.memoryProfile}</div>
+        {profile ? (
+          <div className="space-y-2 mb-6">
+            {Object.entries(profile).map(([k, v]) => (
+              <div key={k} className="flex gap-4 py-2" style={{ borderBottom: '1px solid var(--line-soft)' }}>
+                <div className="w-32 text-[11px] uppercase tracking-wider flex-shrink-0" style={{ color: 'var(--ink-mute)' }}>
+                  {k.replace(/_/g, ' ')}
+                </div>
+                <div className="text-[13px] flex-1" style={{ color: 'var(--ink)' }}>{v || '—'}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-[13px] py-4 mb-6" style={{ color: 'var(--ink-mute)' }}>
+            {t.memoryNoProfile}
+          </div>
+        )}
+
+        <div className="eyebrow mb-3">{t.memoryResumes(resumes.length)}</div>
+        {resumes.length > 0 ? (
+          <div className="space-y-2 mb-6">
+            {resumes.map(r => (
+              <div key={r.id} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--line-soft)' }}>
+                <FileText size={12} color="var(--sage)" />
+                <div className="text-[13px] flex-1" style={{ color: 'var(--ink)' }}>{r.filename}</div>
+                <div className="text-[10px] font-mono" style={{ color: 'var(--ink-mute)' }}>
+                  {new Date(r.uploadedAt).toLocaleDateString()}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-[13px] py-4 mb-6" style={{ color: 'var(--ink-mute)' }}>
+            {t.memoryNoResumes}
+          </div>
+        )}
+
+        <button onClick={onClearAll}
+                className="flex items-center gap-2 text-[12px] px-3 py-2 rounded-md border transition-colors hover:bg-[#FDF5F3]"
+                style={{ borderColor: 'var(--line)', color: 'var(--danger)' }}>
+          <Trash2 size={12} /> {t.clearAll}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────
+// Resume Editor — split pane with highlight optimize + chat + export
+// ───────────────────────────────────────────────────────────────
+function ResumeEditor({ t, resume, onClose, onSave, profile, language, onUpgradeToStructured }) {
+  const [content, setContent] = useState(resume.text);
+  const [undoStack, setUndoStack] = useState([]);
+  const [editorMessages, setEditorMessages] = useState([]);
+  const [editorInput, setEditorInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [selection, setSelection] = useState(null); // {start, end, text}
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [exportStatus, setExportStatus] = useState(null);
+  const textareaRef = useRef(null);
+  const chatEndRef = useRef(null);
+
+  const handleUpgrade = async () => {
+    if (!onUpgradeToStructured) return;
+    setUpgrading(true);
+    try {
+      await onUpgradeToStructured();
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [editorMessages, loading]);
+
+  const handleSelect = () => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    if (start === end) {
+      setSelection(null);
+      return;
+    }
+    setSelection({ start, end, text: ta.value.substring(start, end) });
+  };
+
+  const pushUndo = (prevContent) => {
+    setUndoStack(s => [...s.slice(-9), prevContent]);
+  };
+
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    setContent(prev);
+    onSave(prev);
+    setUndoStack(s => s.slice(0, -1));
+  };
+
+  const applySelectionEdit = async (action) => {
+    if (!selection) return;
+    setLoading(true);
+    const { system, messages } = buildSelectionEditPrompt({
+      content, selection: selection.text, action, language,
+    });
+    const result = await callClaude({ messages, system, maxTokens: 600 });
+    setLoading(false);
+    if (result.raw) {
+      pushUndo(content);
+      let newText = result.raw.trim();
+      // Strip wrapping quotes if present
+      if ((newText.startsWith('"') && newText.endsWith('"'))
+       || (newText.startsWith('"') && newText.endsWith('"'))) {
+        newText = newText.slice(1, -1);
+      }
+      const newContent = content.slice(0, selection.start) + newText + content.slice(selection.end);
+      setContent(newContent);
+      onSave(newContent);
+      setSelection(null);
+      setCustomPrompt('');
+    }
+  };
+
+  const sendChatMessage = async () => {
+    const text = editorInput.trim();
+    if (!text || loading) return;
+    setEditorInput('');
+    const newMessages = [...editorMessages, { role: 'user', content: text }];
+    setEditorMessages(newMessages);
+    setLoading(true);
+
+    const system = buildEditorChatPrompt({ content, profile, language });
+    const apiMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
+    const result = await callClaude({ messages: apiMessages, system, maxTokens: 4000 });
+    setLoading(false);
+
+    let responseText = result.raw || (result.error ? `⚠️ ${result.error}` : '(No response)');
+    let revisedContent = null;
+    const revisedMatch = responseText.match(/\[REVISED\]([\s\S]*?)\[\/REVISED\]/);
+    if (revisedMatch) {
+      revisedContent = revisedMatch[1].trim();
+      responseText = responseText.replace(/\[REVISED\][\s\S]*?\[\/REVISED\]/, '').trim();
+    }
+
+    setEditorMessages(prev => [...prev, {
+      role: 'assistant',
+      content: responseText,
+      revised: revisedContent,
+    }]);
+  };
+
+  const applyRevision = (revised) => {
+    pushUndo(content);
+    setContent(revised);
+    onSave(revised);
+  };
+
+  // ── PDF export
+  const exportPdf = async () => {
+    setExportStatus(t.loadingPdfLib);
+    try {
+      const html2pdf = await loadHtml2Pdf();
+      setExportStatus(t.generatingPdf);
+      const container = document.createElement('div');
+      container.style.cssText = 'font-family: Georgia, "Times New Roman", serif; padding: 40px 50px; max-width: 720px; color: #1A2420; line-height: 1.5; font-size: 11pt;';
+      const html = content
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .split('\n')
+        .map(line => {
+          if (/^#\s/.test(line))    return `<h1 style="font-size: 20pt; margin: 16px 0 8px; color: #0F3D2E; font-weight: 600;">${line.replace(/^#\s/, '')}</h1>`;
+          if (/^##\s/.test(line))   return `<h2 style="font-size: 14pt; margin: 14px 0 6px; color: #0F3D2E; border-bottom: 1px solid #aaa; padding-bottom: 2px; font-weight: 600;">${line.replace(/^##\s/, '')}</h2>`;
+          if (/^###\s/.test(line))  return `<h3 style="font-size: 12pt; margin: 10px 0 4px; color: #0F3D2E; font-weight: 600;">${line.replace(/^###\s/, '')}</h3>`;
+          if (/^[-•*]\s/.test(line)) return `<div style="margin: 2px 0 2px 20px;">• ${line.replace(/^[-•*]\s/, '')}</div>`;
+          if (line.trim() === '')   return '<div style="height: 6px;"></div>';
+          return `<div>${line}</div>`;
+        }).join('');
+      container.innerHTML = html;
+      document.body.appendChild(container);
+
+      await html2pdf().from(container).set({
+        margin: [10, 10, 10, 10],
+        filename: resume.filename.replace(/\.[^.]+$/, '') + '.pdf',
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      }).save();
+      document.body.removeChild(container);
+      setExportStatus(null);
+    } catch (err) {
+      setExportStatus(t.pdfFailed(err.message));
+      setTimeout(() => setExportStatus(null), 4000);
+    }
+  };
+
+  // ── Excel export
+  const exportExcel = async () => {
+    setExportStatus(t.loadingExcelLib);
+    try {
+      const XLSX = await loadXlsx();
+      setExportStatus(t.generatingExcel);
+      const lines = content.split('\n');
+      const data = [['Section', 'Content']];
+      let currentSection = '(header)';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (/^#{1,3}\s/.test(trimmed)) {
+          currentSection = trimmed.replace(/^#+\s/, '');
+          data.push([currentSection, '']);
+        } else {
+          data.push(['', trimmed.replace(/^[-•*]\s/, '')]);
+        }
+      }
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [{ wch: 24 }, { wch: 80 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Resume');
+      XLSX.writeFile(wb, resume.filename.replace(/\.[^.]+$/, '') + '.xlsx');
+      setExportStatus(null);
+    } catch (err) {
+      setExportStatus(t.excelFailed(err.message));
+      setTimeout(() => setExportStatus(null), 4000);
+    }
+  };
+
+  // ── DOCX export (parses markdown content into paragraphs)
+  const exportDocx = async () => {
+    setExportStatus(t.loadingDocxLib);
+    try {
+      setExportStatus(t.generatingDocx);
+      const blob = await buildMarkdownResumeDocx(content);
+      downloadBlob(blob, resume.filename.replace(/\.[^.]+$/, '') + '.docx');
+      setExportStatus(null);
+    } catch (err) {
+      setExportStatus(t.docxFailed(err.message));
+      setTimeout(() => setExportStatus(null), 4000);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col fade-in" style={{ background: 'var(--bg)' }}>
+      {/* Header */}
+      <div className="px-8 py-4 flex items-center justify-between flex-shrink-0"
+           style={{ borderBottom: '1px solid var(--line-soft)', background: 'var(--paper)' }}>
+        <div className="flex items-center gap-4">
+          <button onClick={onClose}
+                  className="w-8 h-8 rounded-md flex items-center justify-center hover:bg-[var(--bg-sunk)]">
+            <X size={16} />
+          </button>
+          <div>
+            <div className="eyebrow">{t.editorTitle}</div>
+            <div className="font-display text-[18px]" style={{ color: 'var(--forest)' }}>{resume.filename}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {exportStatus && (
+            <div className="text-[11px] px-3" style={{ color: 'var(--ink-mute)' }}>
+              {exportStatus}
+            </div>
+          )}
+          {onUpgradeToStructured && (
+            <button onClick={handleUpgrade} disabled={upgrading || loading}
+                    className="px-3 py-2 rounded-md text-[12px] border flex items-center gap-1.5 disabled:opacity-50"
+                    style={{ borderColor: 'var(--sage)', color: 'var(--forest)', background: 'var(--mint)' }}>
+              {upgrading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              {language === 'zh' ? '转为可视化编辑器' : 'Visual editor'}
+            </button>
+          )}
+          {undoStack.length > 0 && (
+            <button onClick={handleUndo}
+                    className="px-3 py-2 rounded-md text-[12px] border flex items-center gap-1.5"
+                    style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
+              <Undo2 size={12} /> {t.undo}
+            </button>
+          )}
+          <button onClick={exportPdf} disabled={loading}
+                  className="px-4 py-2 rounded-md text-[12px] font-medium flex items-center gap-1.5 disabled:opacity-50"
+                  style={{ background: 'var(--forest)', color: 'white' }}>
+            <Download size={12} /> {t.exportPdf}
+          </button>
+          <button onClick={exportDocx} disabled={loading}
+                  className="px-4 py-2 rounded-md text-[12px] font-medium flex items-center gap-1.5 border disabled:opacity-50"
+                  style={{ borderColor: 'var(--forest)', color: 'var(--forest)' }}>
+            <Download size={12} /> {t.exportDocx}
+          </button>
+          <button onClick={exportExcel} disabled={loading}
+                  className="px-4 py-2 rounded-md text-[12px] font-medium flex items-center gap-1.5 border disabled:opacity-50"
+                  style={{ borderColor: 'var(--forest)', color: 'var(--forest)' }}>
+            <Download size={12} /> {t.exportExcel}
+          </button>
+        </div>
+      </div>
+
+      {/* Selection toolbar */}
+      {selection && (
+        <div className="px-8 py-3 flex items-center gap-2 flex-wrap fade-in"
+             style={{ background: 'var(--mint)', borderBottom: '1px solid var(--line-soft)' }}>
+          <div className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--forest)' }}>
+            {t.selectedChars(selection.text.length)}
+          </div>
+          {[
+            { label: t.optConcise,      action: 'make this more concise and punchy' },
+            { label: t.optMetrics,      action: 'add quantified metrics and numbers to make this more impactful' },
+            { label: t.optVerbs,        action: 'rewrite using stronger action verbs' },
+            { label: t.optProfessional, action: 'rewrite in a professional recruiter-friendly tone' },
+          ].map(opt => (
+            <button
+              key={opt.label}
+              onClick={() => applySelectionEdit(opt.action)}
+              disabled={loading}
+              className="px-3 py-1 rounded-md text-[11px] font-medium disabled:opacity-50"
+              style={{ background: 'var(--forest)', color: 'white' }}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <input
+            value={customPrompt}
+            onChange={e => setCustomPrompt(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && customPrompt.trim()) {
+                applySelectionEdit(customPrompt.trim());
+              }
+            }}
+            placeholder={t.customInstructionPlaceholder}
+            className="px-3 py-1 rounded-md text-[11px] border bg-white flex-1 min-w-[180px]"
+            style={{ borderColor: 'var(--forest)' }}
+          />
+          {loading && <Loader2 size={12} className="animate-spin" color="var(--forest)" />}
+        </div>
+      )}
+
+      {/* Split pane */}
+      <div className="flex-1 flex min-h-0">
+        {/* Editor */}
+        <div className="flex-1 overflow-y-auto p-10" style={{ background: 'var(--paper)' }}>
+          <div className="max-w-2xl mx-auto">
+            <div className="text-[11px] mb-4" style={{ color: 'var(--ink-mute)' }}>
+              {t.editorHint}
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={e => { setContent(e.target.value); onSave(e.target.value); }}
+              onSelect={handleSelect}
+              onMouseUp={handleSelect}
+              onKeyUp={handleSelect}
+              spellCheck={false}
+              className="w-full focus:outline-none resize-none"
+              style={{
+                minHeight: '75vh',
+                color: 'var(--ink)',
+                background: 'transparent',
+                border: 'none',
+                fontFamily: "'Geist Mono', ui-monospace, monospace",
+                fontSize: '13px',
+                lineHeight: '1.7',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Chat */}
+        <div className="w-[400px] flex flex-col border-l flex-shrink-0"
+             style={{ borderColor: 'var(--line-soft)', background: 'var(--bg-sunk)' }}>
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--line-soft)' }}>
+            <div className="eyebrow">{t.refinementChat}</div>
+            <div className="text-[11px] mt-1" style={{ color: 'var(--ink-soft)' }}>
+              {t.refinementSub}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 chat-scroll">
+            {editorMessages.length === 0 && !loading && (
+              <div className="text-[12px] space-y-2" style={{ color: 'var(--ink-mute)' }}>
+                <div>{t.tryLabel}</div>
+                <div className="italic">{t.example1}</div>
+                <div className="italic">{t.example2}</div>
+                <div className="italic">{t.example3}</div>
+                <div className="italic">{t.example4}</div>
+              </div>
+            )}
+            {editorMessages.map((m, idx) => (
+              <div key={idx} className="fade-in">
+                {m.role === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] px-3 py-2 rounded-xl rounded-tr-sm text-[12px] leading-relaxed"
+                         style={{ background: 'var(--forest)', color: 'white' }}>
+                      {m.content}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex gap-2 items-start">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                           style={{ background: 'var(--mint)' }}>
+                        <Sparkles size={9} color="var(--forest)" />
+                      </div>
+                      <div className="flex-1 text-[12px] leading-relaxed" style={{ color: 'var(--ink)' }}>
+                        {renderMarkdown(m.content)}
+                      </div>
+                    </div>
+                    {m.revised && (
+                      <button
+                        onClick={() => applyRevision(m.revised)}
+                        className="mt-2 ml-7 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-medium"
+                        style={{ background: 'var(--mint)', color: 'var(--forest)', border: '1px solid var(--forest)' }}
+                      >
+                        <Check size={10} /> {t.applyRevision}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            {loading && (
+              <div className="flex gap-2 items-center">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                     style={{ background: 'var(--mint)' }}>
+                  <Sparkles size={9} color="var(--forest)" />
+                </div>
+                <div className="dots py-1"><span /><span /><span /></div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          <div className="p-4" style={{ borderTop: '1px solid var(--line-soft)' }}>
+            <div className="flex items-end gap-2 p-2 rounded-md border"
+                 style={{ background: 'var(--paper)', borderColor: 'var(--line)' }}>
+              <textarea
+                value={editorInput}
+                onChange={e => setEditorInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                  }
+                }}
+                placeholder={t.askForChange}
+                rows={1}
+                className="flex-1 resize-none bg-transparent text-[12px] max-h-32 focus:outline-none"
+              />
+              <button
+                onClick={sendChatMessage}
+                disabled={!editorInput.trim() || loading}
+                className="w-7 h-7 rounded-md flex items-center justify-center disabled:opacity-30 flex-shrink-0"
+                style={{ background: 'var(--forest)', color: 'white' }}
+              >
+                <Send size={12} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────
+// Structured Resume Editor — WYSIWYG field-level editing
+// ───────────────────────────────────────────────────────────────
+function StructuredResumeEditor({ t, resume, onClose, onSave, profile, language }) {
+  const [data, setData] = useState(resume.structured || EMPTY_RESUME());
+  const [undoStack, setUndoStack] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [optimizing, setOptimizing] = useState(null); // { secIdx, itemIdx, bulletIdx }
+  const [exportStatus, setExportStatus] = useState(null);
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, loading]);
+
+  const pushUndo = (prev) => setUndoStack(s => [...s.slice(-19), prev]);
+
+  const commit = (newData) => {
+    pushUndo(data);
+    setData(newData);
+    onSave(newData);
+  };
+
+  const handleUndo = () => {
+    if (!undoStack.length) return;
+    const prev = undoStack[undoStack.length - 1];
+    setData(prev);
+    onSave(prev);
+    setUndoStack(s => s.slice(0, -1));
+  };
+
+  // ── Field mutators
+  const updateHeader = (field, value) => {
+    commit({ ...data, header: { ...data.header, [field]: value } });
+  };
+
+  const updateItemField = (secIdx, itemIdx, field, value) => {
+    const next = structuredClone(data);
+    next.sections[secIdx].items[itemIdx][field] = value;
+    commit(next);
+  };
+
+  const updateBullet = (secIdx, itemIdx, bulletIdx, value) => {
+    const next = structuredClone(data);
+    next.sections[secIdx].items[itemIdx].bullets[bulletIdx] = value;
+    commit(next);
+  };
+
+  const updateSectionTitle = (secIdx, value) => {
+    const next = structuredClone(data);
+    next.sections[secIdx].title = value;
+    commit(next);
+  };
+
+  const addBullet = (secIdx, itemIdx) => {
+    const next = structuredClone(data);
+    next.sections[secIdx].items[itemIdx].bullets.push('');
+    commit(next);
+  };
+
+  const removeBullet = (secIdx, itemIdx, bulletIdx) => {
+    const next = structuredClone(data);
+    next.sections[secIdx].items[itemIdx].bullets.splice(bulletIdx, 1);
+    commit(next);
+  };
+
+  const addItem = (secIdx) => {
+    const next = structuredClone(data);
+    next.sections[secIdx].items.push(EMPTY_ITEM());
+    commit(next);
+  };
+
+  const removeItem = (secIdx, itemIdx) => {
+    if (!confirm(language === 'zh' ? '删除这一条？' : 'Delete this entry?')) return;
+    const next = structuredClone(data);
+    next.sections[secIdx].items.splice(itemIdx, 1);
+    commit(next);
+  };
+
+  const addSection = () => {
+    const next = structuredClone(data);
+    next.sections.push({
+      type: 'other',
+      title: language === 'zh' ? '新小节' : 'New Section',
+      items: [EMPTY_ITEM()],
+    });
+    commit(next);
+  };
+
+  const removeSection = (secIdx) => {
+    if (!confirm(language === 'zh' ? '删除整个小节？' : 'Delete entire section?')) return;
+    const next = structuredClone(data);
+    next.sections.splice(secIdx, 1);
+    commit(next);
+  };
+
+  // ── AI optimize a single bullet
+  const optimizeBullet = async (secIdx, itemIdx, bulletIdx, action) => {
+    const bullet = data.sections[secIdx].items[itemIdx].bullets[bulletIdx];
+    if (!bullet) return;
+    setOptimizing({ secIdx, itemIdx, bulletIdx });
+
+    const langInstr = language === 'zh' ? 'Respond in Chinese.' : 'Respond in English.';
+    const system = `You are an expert resume editor. Rewrite the given bullet point using strong action verbs, concrete metrics, concise professional language. Do NOT add content unsupported by the original. ${langInstr} Output ONLY the rewritten bullet, no quotes, no explanations.`;
+    const userMsg = `Original bullet: ${bullet}\n\nAction: ${action}`;
+
+    const result = await callClaude({
+      messages: [{ role: 'user', content: userMsg }],
+      system,
+      maxTokens: 300,
+    });
+    setOptimizing(null);
+    if (result.raw) {
+      let newBullet = result.raw.trim().replace(/^[-•*]\s*/, '').replace(/^["'"]|["'"]$/g, '');
+      const next = structuredClone(data);
+      next.sections[secIdx].items[itemIdx].bullets[bulletIdx] = newBullet;
+      commit(next);
+    }
+  };
+
+  // ── Chat to refine whole resume
+  const sendChatMessage = async () => {
+    const text = chatInput.trim();
+    if (!text || loading) return;
+    setChatInput('');
+    const newMessages = [...chatMessages, { role: 'user', content: text }];
+    setChatMessages(newMessages);
+    setLoading(true);
+
+    const langInstr = language === 'zh' ? 'Respond in Chinese.' : 'Respond in English.';
+    const system = `You are an expert resume editor working on a structured resume. Current resume JSON:
+
+${JSON.stringify(data, null, 2)}
+
+${langInstr}
+
+${TONE_STANDARD}
+
+When the student asks for a change:
+1. Give a 1-2 sentence explanation of what you're changing.
+2. At the END of your message, output the COMPLETE revised resume JSON wrapped in [REVISED_JSON]...[/REVISED_JSON] tags. Schema: { header: {name, phone, email, location, links}, sections: [{type, title, items: [{org, role, location, dateRange, bullets}]}] }. Every item MUST have all 5 fields.
+
+If the request doesn't require changes, just answer briefly without the tags.`;
+
+    const apiMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
+    const result = await callClaude({ messages: apiMessages, system, maxTokens: 4500 });
+    setLoading(false);
+
+    let responseText = result.raw || (result.error ? `⚠️ ${result.error}` : '(No response)');
+    let revisedData = null;
+    const m = responseText.match(/\[REVISED_JSON\]([\s\S]*?)\[\/REVISED_JSON\]/);
+    if (m) {
+      try {
+        revisedData = JSON.parse(m[1].trim());
+      } catch (e) { console.error('Failed to parse REVISED_JSON', e); }
+      responseText = responseText.replace(/\[REVISED_JSON\][\s\S]*?\[\/REVISED_JSON\]/, '').trim();
+    }
+    setChatMessages(prev => [...prev, { role: 'assistant', content: responseText, revised: revisedData }]);
+  };
+
+  const applyRevision = (revised) => {
+    commit(revised);
+  };
+
+  // ── PDF export — matches the visual style of the WYSIWYG
+  const exportPdf = async () => {
+    setExportStatus(t.loadingPdfLib);
+    try {
+      const html2pdf = await loadHtml2Pdf();
+      setExportStatus(t.generatingPdf);
+
+      const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const contact = [data.header?.phone, data.header?.email, data.header?.location]
+        .filter(Boolean).map(esc).join(' &nbsp;|&nbsp; ');
+
+      const sectionsHtml = (data.sections || []).map(sec => {
+        const itemsHtml = (sec.items || []).map(item => {
+          const topLeft = esc(item.org);
+          const topRight = esc(item.location);
+          const midLeft = esc(item.role);
+          const midRight = esc(item.dateRange);
+          const bulletsHtml = (item.bullets || []).filter(Boolean).map(b =>
+            `<div style="margin: 3px 0 3px 18px; text-indent: -12px; padding-left: 12px;">■ ${esc(b)}</div>`
+          ).join('');
+          return `
+            <div style="margin-bottom: 10px;">
+              ${(topLeft || topRight) ? `<div style="display: flex; justify-content: space-between; font-weight: 700;"><span>${topLeft}</span><span>${topRight}</span></div>` : ''}
+              ${(midLeft || midRight) ? `<div style="display: flex; justify-content: space-between; font-style: italic; color: #333;"><span>${midLeft}</span><span>${midRight}</span></div>` : ''}
+              ${bulletsHtml}
+            </div>`;
+        }).join('');
+        return `
+          <section style="margin-top: 14px;">
+            <h2 style="font-size: 13pt; font-weight: 700; margin: 0 0 4px; padding-bottom: 2px; border-bottom: 1.5px solid #000;">${esc(sec.title)}</h2>
+            ${itemsHtml}
+          </section>`;
+      }).join('');
+
+      const container = document.createElement('div');
+      container.style.cssText = 'font-family: "Times New Roman", Times, serif; padding: 32px 40px; max-width: 760px; color: #000; line-height: 1.4; font-size: 10.5pt;';
+      container.innerHTML = `
+        <div style="text-align: center; margin-bottom: 6px;">
+          <div style="font-size: 22pt; font-weight: 700; letter-spacing: 1px;">${esc(data.header?.name)}</div>
+          <div style="font-size: 10pt; color: #222; margin-top: 2px;">${contact}</div>
+        </div>
+        ${sectionsHtml}
+      `;
+      document.body.appendChild(container);
+
+      await html2pdf().from(container).set({
+        margin: [10, 10, 10, 10],
+        filename: (data.header?.name || 'resume') + '.pdf',
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      }).save();
+      document.body.removeChild(container);
+      setExportStatus(null);
+    } catch (err) {
+      setExportStatus(t.pdfFailed(err.message));
+      setTimeout(() => setExportStatus(null), 4000);
+    }
+  };
+
+  // ── Excel export — structured rows
+  const exportExcel = async () => {
+    setExportStatus(t.loadingExcelLib);
+    try {
+      const XLSX = await loadXlsx();
+      setExportStatus(t.generatingExcel);
+      const rows = [['Section', 'Org', 'Role', 'Location', 'Date', 'Bullet']];
+      for (const sec of data.sections || []) {
+        for (const item of sec.items || []) {
+          const bullets = item.bullets?.length ? item.bullets : [''];
+          for (const b of bullets) {
+            rows.push([sec.title || '', item.org || '', item.role || '', item.location || '', item.dateRange || '', b || '']);
+          }
+        }
+      }
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 60 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Resume');
+      XLSX.writeFile(wb, (data.header?.name || 'resume') + '.xlsx');
+      setExportStatus(null);
+    } catch (err) {
+      setExportStatus(t.excelFailed(err.message));
+      setTimeout(() => setExportStatus(null), 4000);
+    }
+  };
+
+  // ── DOCX export — native Word format
+  const exportDocx = async () => {
+    setExportStatus(t.loadingDocxLib);
+    try {
+      setExportStatus(t.generatingDocx);
+      const blob = await buildStructuredResumeDocx(data);
+      downloadBlob(blob, (data.header?.name || 'resume') + '.docx');
+      setExportStatus(null);
+    } catch (err) {
+      setExportStatus(t.docxFailed(err.message));
+      setTimeout(() => setExportStatus(null), 4000);
+    }
+  };
+
+  // ── Inline editable field
+  const Editable = ({ value, onChange, placeholder, className, style, multiline, align }) => {
+    const [local, setLocal] = useState(value || '');
+    useEffect(() => { setLocal(value || ''); }, [value]);
+    const commonProps = {
+      value: local,
+      onChange: (e) => setLocal(e.target.value),
+      onBlur: () => { if (local !== value) onChange(local); },
+      placeholder: placeholder || '',
+      className: className || '',
+      style: {
+        background: 'transparent',
+        border: 'none',
+        outline: 'none',
+        width: '100%',
+        padding: '1px 2px',
+        borderRadius: '2px',
+        textAlign: align || 'left',
+        ...style,
+      },
+      onFocus: (e) => { e.target.style.background = '#FFF9E6'; },
+      onBlurCapture: (e) => { e.target.style.background = 'transparent'; },
+    };
+    if (multiline) {
+      return <textarea {...commonProps} rows={1} onInput={(e) => {
+        e.target.style.height = 'auto';
+        e.target.style.height = e.target.scrollHeight + 'px';
+      }} />;
+    }
+    return <input type="text" {...commonProps} />;
+  };
+
+  const headerName = data.header?.name || '';
+  const headerContactParts = [data.header?.phone, data.header?.email, data.header?.location].filter(Boolean);
+
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col fade-in" style={{ background: 'var(--bg)' }}>
+      {/* Header toolbar */}
+      <div className="px-8 py-4 flex items-center justify-between flex-shrink-0"
+           style={{ borderBottom: '1px solid var(--line-soft)', background: 'var(--paper)' }}>
+        <div className="flex items-center gap-4">
+          <button onClick={onClose}
+                  className="w-8 h-8 rounded-md flex items-center justify-center hover:bg-[var(--bg-sunk)]">
+            <X size={16} />
+          </button>
+          <div>
+            <div className="eyebrow">{t.editorTitle}</div>
+            <div className="font-display text-[18px]" style={{ color: 'var(--forest)' }}>
+              {data.header?.name || resume.filename}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {exportStatus && (
+            <div className="text-[11px] px-3" style={{ color: 'var(--ink-mute)' }}>{exportStatus}</div>
+          )}
+          {undoStack.length > 0 && (
+            <button onClick={handleUndo}
+                    className="px-3 py-2 rounded-md text-[12px] border flex items-center gap-1.5"
+                    style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
+              <Undo2 size={12} /> {t.undo}
+            </button>
+          )}
+          <button onClick={exportPdf} disabled={loading}
+                  className="px-4 py-2 rounded-md text-[12px] font-medium flex items-center gap-1.5 disabled:opacity-50"
+                  style={{ background: 'var(--forest)', color: 'white' }}>
+            <Download size={12} /> {t.exportPdf}
+          </button>
+          <button onClick={exportDocx} disabled={loading}
+                  className="px-4 py-2 rounded-md text-[12px] font-medium flex items-center gap-1.5 border disabled:opacity-50"
+                  style={{ borderColor: 'var(--forest)', color: 'var(--forest)' }}>
+            <Download size={12} /> {t.exportDocx}
+          </button>
+          <button onClick={exportExcel} disabled={loading}
+                  className="px-4 py-2 rounded-md text-[12px] font-medium flex items-center gap-1.5 border disabled:opacity-50"
+                  style={{ borderColor: 'var(--forest)', color: 'var(--forest)' }}>
+            <Download size={12} /> {t.exportExcel}
+          </button>
+        </div>
+      </div>
+
+      {/* Split pane */}
+      <div className="flex-1 flex min-h-0">
+        {/* WYSIWYG editor — left side */}
+        <div className="flex-1 overflow-y-auto py-10 chat-scroll" style={{ background: '#F2EFE8' }}>
+          <div
+            className="mx-auto bg-white shadow-lg"
+            style={{
+              width: '760px',
+              minHeight: '1000px',
+              padding: '40px 56px',
+              fontFamily: '"Times New Roman", Times, serif',
+              fontSize: '11pt',
+              color: '#000',
+              lineHeight: 1.4,
+            }}
+          >
+            {/* Header — centered name + contact */}
+            <div style={{ textAlign: 'center', marginBottom: 10 }}>
+              <Editable
+                value={headerName}
+                onChange={(v) => updateHeader('name', v)}
+                placeholder={language === 'zh' ? '姓名' : 'Full Name'}
+                style={{ fontSize: '22pt', fontWeight: 700, letterSpacing: '1px', textAlign: 'center' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, fontSize: '10pt', color: '#222', marginTop: 2 }}>
+                <Editable
+                  value={data.header?.phone}
+                  onChange={(v) => updateHeader('phone', v)}
+                  placeholder={language === 'zh' ? '电话' : 'Phone'}
+                  style={{ textAlign: 'center', maxWidth: '160px' }}
+                />
+                <span style={{ color: '#888' }}>|</span>
+                <Editable
+                  value={data.header?.email}
+                  onChange={(v) => updateHeader('email', v)}
+                  placeholder="Email"
+                  style={{ textAlign: 'center', maxWidth: '220px' }}
+                />
+                <span style={{ color: '#888' }}>|</span>
+                <Editable
+                  value={data.header?.location}
+                  onChange={(v) => updateHeader('location', v)}
+                  placeholder={language === 'zh' ? '城市' : 'Location'}
+                  style={{ textAlign: 'center', maxWidth: '140px' }}
+                />
+              </div>
+            </div>
+
+            {/* Sections */}
+            {(data.sections || []).map((sec, secIdx) => (
+              <section key={secIdx} style={{ marginTop: 16 }} className="group/section relative">
+                <div style={{ borderBottom: '1.5px solid #000', paddingBottom: 2, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Editable
+                    value={sec.title}
+                    onChange={(v) => updateSectionTitle(secIdx, v)}
+                    placeholder={language === 'zh' ? '小节标题' : 'Section Title'}
+                    style={{ fontSize: '13pt', fontWeight: 700, flex: 1 }}
+                  />
+                  <button
+                    onClick={() => removeSection(secIdx)}
+                    className="opacity-0 group-hover/section:opacity-100 transition-opacity"
+                    style={{ color: '#B85C50', fontSize: 10, padding: '2px 4px' }}
+                    title={language === 'zh' ? '删除小节' : 'Delete section'}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+
+                {(sec.items || []).map((item, itemIdx) => (
+                  <div key={itemIdx} style={{ marginBottom: 12 }} className="group/item relative">
+                    {/* Top row: org | location */}
+                    <div style={{ display: 'flex', gap: 8, fontWeight: 700 }}>
+                      <Editable
+                        value={item.org}
+                        onChange={(v) => updateItemField(secIdx, itemIdx, 'org', v)}
+                        placeholder={language === 'zh' ? '机构/公司/项目' : 'Org / Company / Title'}
+                        style={{ fontWeight: 700, flex: 1 }}
+                      />
+                      <Editable
+                        value={item.location}
+                        onChange={(v) => updateItemField(secIdx, itemIdx, 'location', v)}
+                        placeholder={language === 'zh' ? '地点' : 'Location'}
+                        style={{ fontWeight: 700, textAlign: 'right', maxWidth: '160px' }}
+                        align="right"
+                      />
+                    </div>
+                    {/* Middle row: role | dateRange */}
+                    <div style={{ display: 'flex', gap: 8, fontStyle: 'italic', color: '#333' }}>
+                      <Editable
+                        value={item.role}
+                        onChange={(v) => updateItemField(secIdx, itemIdx, 'role', v)}
+                        placeholder={language === 'zh' ? '职位/学位/作者信息' : 'Role / Degree / Authorship'}
+                        style={{ fontStyle: 'italic', flex: 1 }}
+                      />
+                      <Editable
+                        value={item.dateRange}
+                        onChange={(v) => updateItemField(secIdx, itemIdx, 'dateRange', v)}
+                        placeholder={language === 'zh' ? '时间' : 'Date'}
+                        style={{ fontStyle: 'italic', textAlign: 'right', maxWidth: '180px' }}
+                        align="right"
+                      />
+                    </div>
+                    {/* Bullets */}
+                    {(item.bullets || []).map((bullet, bulletIdx) => {
+                      const isOptimizing = optimizing
+                        && optimizing.secIdx === secIdx
+                        && optimizing.itemIdx === itemIdx
+                        && optimizing.bulletIdx === bulletIdx;
+                      return (
+                        <div key={bulletIdx} className="group/bullet relative flex items-start gap-1" style={{ marginTop: 2 }}>
+                          <span style={{ fontSize: '8pt', lineHeight: '1.8', width: '14px', flexShrink: 0, textAlign: 'center' }}>■</span>
+                          <div style={{ flex: 1 }}>
+                            <Editable
+                              value={bullet}
+                              onChange={(v) => updateBullet(secIdx, itemIdx, bulletIdx, v)}
+                              placeholder={language === 'zh' ? '成果要点' : 'Achievement bullet'}
+                              multiline
+                            />
+                          </div>
+                          <div className="opacity-0 group-hover/bullet:opacity-100 transition-opacity flex items-center gap-0.5 flex-shrink-0">
+                            {isOptimizing ? (
+                              <Loader2 size={10} className="animate-spin" color="var(--forest)" />
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => optimizeBullet(secIdx, itemIdx, bulletIdx, 'make more concise')}
+                                  className="text-[9px] px-1 rounded hover:bg-[var(--mint)]"
+                                  style={{ color: 'var(--forest)' }}
+                                  title={t.optConcise}
+                                >
+                                  {t.optConcise}
+                                </button>
+                                <button
+                                  onClick={() => optimizeBullet(secIdx, itemIdx, bulletIdx, 'add quantified metrics')}
+                                  className="text-[9px] px-1 rounded hover:bg-[var(--mint)]"
+                                  style={{ color: 'var(--forest)' }}
+                                  title={t.optMetrics}
+                                >
+                                  {t.optMetrics}
+                                </button>
+                                <button
+                                  onClick={() => optimizeBullet(secIdx, itemIdx, bulletIdx, 'use stronger action verbs')}
+                                  className="text-[9px] px-1 rounded hover:bg-[var(--mint)]"
+                                  style={{ color: 'var(--forest)' }}
+                                  title={t.optVerbs}
+                                >
+                                  {t.optVerbs}
+                                </button>
+                                <button
+                                  onClick={() => removeBullet(secIdx, itemIdx, bulletIdx)}
+                                  className="text-[9px] px-1 rounded hover:bg-[#FDF5F3]"
+                                  style={{ color: 'var(--danger)' }}
+                                >
+                                  <X size={9} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        onClick={() => addBullet(secIdx, itemIdx)}
+                        className="text-[9px] px-1.5 py-0.5 rounded opacity-40 hover:opacity-100 flex items-center gap-1"
+                        style={{ color: 'var(--sage)' }}
+                      >
+                        <Plus size={9} /> {language === 'zh' ? '加要点' : 'Add bullet'}
+                      </button>
+                      <button
+                        onClick={() => removeItem(secIdx, itemIdx)}
+                        className="text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover/item:opacity-60 hover:!opacity-100 flex items-center gap-1"
+                        style={{ color: 'var(--danger)' }}
+                      >
+                        <Trash2 size={9} /> {language === 'zh' ? '删除条目' : 'Delete entry'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => addItem(secIdx)}
+                  className="text-[10px] px-2 py-1 rounded mt-1 flex items-center gap-1 opacity-50 hover:opacity-100"
+                  style={{ color: 'var(--sage)', fontFamily: "'Geist', sans-serif" }}
+                >
+                  <Plus size={10} /> {language === 'zh' ? '添加条目' : 'Add entry'}
+                </button>
+              </section>
+            ))}
+
+            <button
+              onClick={addSection}
+              className="text-[11px] px-3 py-1.5 rounded mt-6 flex items-center gap-1.5 mx-auto opacity-60 hover:opacity-100"
+              style={{
+                color: 'var(--forest)',
+                border: '1px dashed var(--line)',
+                fontFamily: "'Geist', sans-serif",
+              }}
+            >
+              <Plus size={11} /> {language === 'zh' ? '添加小节' : 'Add section'}
+            </button>
+          </div>
+        </div>
+
+        {/* Chat panel — right side */}
+        <div className="w-[400px] flex flex-col border-l flex-shrink-0"
+             style={{ borderColor: 'var(--line-soft)', background: 'var(--bg-sunk)' }}>
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--line-soft)' }}>
+            <div className="eyebrow">{t.refinementChat}</div>
+            <div className="text-[11px] mt-1" style={{ color: 'var(--ink-soft)' }}>
+              {t.refinementSub}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 chat-scroll">
+            {chatMessages.length === 0 && !loading && (
+              <div className="text-[12px] space-y-2" style={{ color: 'var(--ink-mute)' }}>
+                <div>{t.tryLabel}</div>
+                <div className="italic">{t.example1}</div>
+                <div className="italic">{t.example2}</div>
+                <div className="italic">{t.example3}</div>
+                <div className="italic">{t.example4}</div>
+              </div>
+            )}
+            {chatMessages.map((m, idx) => (
+              <div key={idx} className="fade-in">
+                {m.role === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] px-3 py-2 rounded-xl rounded-tr-sm text-[12px] leading-relaxed"
+                         style={{ background: 'var(--forest)', color: 'white' }}>
+                      {m.content}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex gap-2 items-start">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                           style={{ background: 'var(--mint)' }}>
+                        <Sparkles size={9} color="var(--forest)" />
+                      </div>
+                      <div className="flex-1 text-[12px] leading-relaxed" style={{ color: 'var(--ink)' }}>
+                        {renderMarkdown(m.content)}
+                      </div>
+                    </div>
+                    {m.revised && (
+                      <button
+                        onClick={() => applyRevision(m.revised)}
+                        className="mt-2 ml-7 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-medium"
+                        style={{ background: 'var(--mint)', color: 'var(--forest)', border: '1px solid var(--forest)' }}
+                      >
+                        <Check size={10} /> {t.applyRevision}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            {loading && (
+              <div className="flex gap-2 items-center">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                     style={{ background: 'var(--mint)' }}>
+                  <Sparkles size={9} color="var(--forest)" />
+                </div>
+                <div className="dots py-1"><span /><span /><span /></div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          <div className="p-4" style={{ borderTop: '1px solid var(--line-soft)' }}>
+            <div className="flex items-end gap-2 p-2 rounded-md border"
+                 style={{ background: 'var(--paper)', borderColor: 'var(--line)' }}>
+              <textarea
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                  }
+                }}
+                placeholder={t.askForChange}
+                rows={1}
+                className="flex-1 resize-none bg-transparent text-[12px] max-h-32 focus:outline-none"
+              />
+              <button
+                onClick={sendChatMessage}
+                disabled={!chatInput.trim() || loading}
+                className="w-7 h-7 rounded-md flex items-center justify-center disabled:opacity-30 flex-shrink-0"
+                style={{ background: 'var(--forest)', color: 'white' }}
+              >
+                <Send size={12} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LANDING / AUTH / ROUTING SHELL (added for standalone HTML build)
+// ═══════════════════════════════════════════════════════════════
+
+function LandingPage({ onStart, language, setLanguage }) {
+  const t = getT(language);
+  const isZh = language === 'zh';
+  const features = isZh
+    ? [
+        { title: '持久化档案', desc: '一次建档，跨会话记住你的学校、专业、经历、目标。换设备前可导出。', icon: 'User' },
+        { title: '简历库', desc: '上传 PDF/DOCX/Excel，或在应用内从零构建。每份简历独立审阅、编辑。', icon: 'FileText' },
+        { title: '结构化模拟面试', desc: '13 题完整面试，每题 5 维评分反馈，历史趋势图展示你的成长。', icon: 'MessageSquare' },
+        { title: '可视化简历编辑器', desc: 'WYSIWYG 编辑、选中文字一键优化、导出 PDF / Word / Excel。', icon: 'Edit3' },
+      ]
+    : [
+        { title: 'Persistent profile', desc: 'Onboard once. Your school, major, experience, and goals are remembered across every session.', icon: 'User' },
+        { title: 'Resume library', desc: 'Upload PDF/DOCX/Excel or build from scratch in-app. Review and edit each resume independently.', icon: 'FileText' },
+        { title: 'Structured mock interview', desc: '13-question full interview, 5-dimension rubric feedback per answer, growth trends over time.', icon: 'MessageSquare' },
+        { title: 'Visual resume editor', desc: 'WYSIWYG editing, one-click AI optimization on any selection, export to PDF / Word / Excel.', icon: 'Edit3' },
+      ];
+
+  const iconMap = { User: User, FileText: FileText, MessageSquare: MessageSquare, Edit3: Edit3 };
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
+      {/* Nav */}
+      <nav className="px-10 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full" style={{ background: 'var(--forest)' }} />
+          <div className="font-display text-[24px] leading-none" style={{ color: 'var(--forest)' }}>
+            Coach<span className="italic" style={{ color: 'var(--sage)' }}>.</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 p-1 rounded-md border" style={{ borderColor: 'var(--line-soft)', background: 'var(--paper)' }}>
+            {LANGUAGES.map(opt => (
+              <button key={opt.id} onClick={() => setLanguage(opt.id)}
+                      className="px-3 py-1 rounded text-[11px] font-medium"
+                      style={{ background: language === opt.id ? 'var(--forest)' : 'transparent',
+                               color: language === opt.id ? 'white' : 'var(--ink-soft)' }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button onClick={onStart}
+                  className="px-4 py-2 rounded-md text-[13px] font-medium"
+                  style={{ background: 'var(--forest)', color: 'white' }}>
+            {isZh ? '登录 / 注册' : 'Log in / Sign up'}
+          </button>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20 max-w-4xl mx-auto">
+        <div className="eyebrow mb-6">{isZh ? '2026 年创立 · 个人隐私优先' : 'Est. 2026 · Privacy-first'}</div>
+        <h1 className="font-display text-[64px] md:text-[84px] leading-[0.95] mb-8" style={{ color: 'var(--forest)' }}>
+          {isZh ? <>AI 求职教练<span className="italic" style={{ color: 'var(--sage)' }}>，</span><br />记住你的每一步<span style={{ color: 'var(--sage)' }}>.</span></>
+                : <>AI recruiting<span className="italic" style={{ color: 'var(--sage)' }}>,</span><br />remembered<span style={{ color: 'var(--sage)' }}>.</span></>}
+        </h1>
+        <p className="text-[17px] leading-relaxed max-w-2xl mb-10" style={{ color: 'var(--ink-soft)' }}>
+          {isZh
+            ? '建档、简历审阅、结构化模拟面试 —— 一个应用全部解决。跨会话记住你的信息，永远从上次停下的地方继续。'
+            : 'Profile onboarding, resume review, and structured mock interviews — all in one place. Remembers you across sessions so you always pick up where you left off.'}
+        </p>
+        <button onClick={onStart}
+                className="px-7 py-3.5 rounded-md text-[15px] font-medium flex items-center gap-2 transition-all hover:opacity-90"
+                style={{ background: 'var(--forest)', color: 'white' }}>
+          {isZh ? '开始使用' : 'Get started'}
+          <ArrowRight size={16} />
+        </button>
+      </section>
+
+      {/* Features */}
+      <section className="px-10 pb-20 max-w-5xl mx-auto w-full">
+        <div className="eyebrow text-center mb-8">{isZh ? '四个核心模块' : 'Four core modules'}</div>
+        <div className="grid md:grid-cols-2 gap-5">
+          {features.map((f, i) => {
+            const Icon = iconMap[f.icon];
+            return (
+              <div key={i} className="p-7 rounded-lg border transition-all hover:border-[var(--forest)]"
+                   style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+                <div className="w-11 h-11 rounded-md flex items-center justify-center mb-4"
+                     style={{ background: 'var(--mint)' }}>
+                  <Icon size={18} color="var(--forest)" />
+                </div>
+                <div className="font-display text-[22px] mb-2" style={{ color: 'var(--forest)' }}>{f.title}</div>
+                <div className="text-[13.5px] leading-relaxed" style={{ color: 'var(--ink-soft)' }}>{f.desc}</div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Footer note */}
+      <footer className="px-10 py-8 text-center text-[11px] border-t" style={{ borderColor: 'var(--line-soft)', color: 'var(--ink-mute)' }}>
+        {isZh ? '演示版 · 数据本地浏览器存储 · 使用你自己的 Anthropic API Key'
+              : 'Demo build · Data stored in your browser · Bring your own Anthropic API key'}
+      </footer>
+    </div>
+  );
+}
+
+function AuthPage({ onLogin, onBack, language }) {
+  const isZh = language === 'zh';
+  const [mode, setMode] = useState('signup');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [signupDone, setSignupDone] = useState(false);
+
+  const submitSignup = async () => {
+    setError(null);
+    if (!email) { setError(isZh ? '需要邮箱' : 'Email required'); return; }
+    if (!password || password.length < 6) { setError(isZh ? '密码至少 6 位' : 'Password must be 6+ chars'); return; }
+    if (password !== confirm) { setError(isZh ? '两次密码不一致' : 'Passwords do not match'); return; }
+    setSubmitting(true);
+    try {
+      const { data, error: authErr } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { phone: phone || '' } },
+      });
+      if (authErr) throw authErr;
+      if (data.session) {
+        // Auto-confirmed (email confirm disabled in Supabase settings)
+        currentUserId = data.user.id;
+        dataCache = {};
+        onLogin();
+      } else {
+        // Email confirmation required
+        setSignupDone(true);
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitLogin = async () => {
+    setError(null);
+    if (!email) { setError(isZh ? '需要邮箱' : 'Email required'); return; }
+    if (!password) { setError(isZh ? '需要密码' : 'Password required'); return; }
+    setSubmitting(true);
+    try {
+      const { data, error: authErr } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (authErr) throw authErr;
+      currentUserId = data.user.id;
+      dataCache = {};
+      onLogin();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (signupDone) {
+    return (
+      <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
+        <nav className="px-10 py-6">
+          <button onClick={onBack} className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--forest)' }} />
+            <div className="font-display text-[22px]" style={{ color: 'var(--forest)' }}>
+              Coach<span className="italic" style={{ color: 'var(--sage)' }}>.</span>
+            </div>
+          </button>
+        </nav>
+        <div className="flex-1 flex items-center justify-center px-6">
+          <div className="max-w-md p-8 rounded-lg border text-center" style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+            <div className="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: 'var(--mint)' }}>
+              <Check size={20} color="var(--forest)" />
+            </div>
+            <h2 className="font-display text-[24px] mb-3" style={{ color: 'var(--forest)' }}>
+              {isZh ? '查看你的邮箱' : 'Check your email'}
+            </h2>
+            <p className="text-[14px] mb-5" style={{ color: 'var(--ink-soft)' }}>
+              {isZh ? `我们向 ${email} 发送了一封确认邮件。点击邮件中的链接完成注册，然后回来登录。`
+                    : `We sent a confirmation email to ${email}. Click the link in the email to verify your account, then come back and log in.`}
+            </p>
+            <button onClick={() => { setSignupDone(false); setMode('login'); }}
+                    className="px-5 py-2.5 rounded-md text-[13px] font-medium"
+                    style={{ background: 'var(--forest)', color: 'white' }}>
+              {isZh ? '去登录' : 'Go to log in'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
+      <nav className="px-10 py-6">
+        <button onClick={onBack} className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full" style={{ background: 'var(--forest)' }} />
+          <div className="font-display text-[22px]" style={{ color: 'var(--forest)' }}>
+            Coach<span className="italic" style={{ color: 'var(--sage)' }}>.</span>
+          </div>
+        </button>
+      </nav>
+
+      <div className="flex-1 flex items-start justify-center px-6 py-10">
+        <div className="w-full max-w-md">
+          <div className="p-8 rounded-lg border" style={{ background: 'var(--paper)', borderColor: 'var(--line-soft)' }}>
+            <div className="eyebrow mb-2">{isZh ? '欢迎' : 'Welcome'}</div>
+            <h2 className="font-display text-[28px] leading-none mb-6" style={{ color: 'var(--forest)' }}>
+              {mode === 'signup' ? (isZh ? '创建账号' : 'Create account') : (isZh ? '登录' : 'Log in')}
+            </h2>
+
+            <div className="flex gap-1 p-1 rounded-md mb-5" style={{ background: 'var(--bg-sunk)' }}>
+              <button onClick={() => { setMode('signup'); setError(null); }}
+                      className="flex-1 py-2 rounded text-[12px] font-medium"
+                      style={{ background: mode === 'signup' ? 'var(--paper)' : 'transparent',
+                               color: mode === 'signup' ? 'var(--forest)' : 'var(--ink-soft)' }}>
+                {isZh ? '注册' : 'Sign up'}
+              </button>
+              <button onClick={() => { setMode('login'); setError(null); }}
+                      className="flex-1 py-2 rounded text-[12px] font-medium"
+                      style={{ background: mode === 'login' ? 'var(--paper)' : 'transparent',
+                               color: mode === 'login' ? 'var(--forest)' : 'var(--ink-soft)' }}>
+                {isZh ? '登录' : 'Log in'}
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--ink-mute)' }}>
+                  {isZh ? '邮箱' : 'Email'}
+                </label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                       placeholder="you@example.com"
+                       className="w-full px-4 py-3 rounded-md text-[14px] border"
+                       style={{ background: 'var(--paper)', borderColor: 'var(--line)' }} />
+              </div>
+
+              {mode === 'signup' && (
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--ink-mute)' }}>
+                    {isZh ? '手机号（可选）' : 'Phone (optional)'}
+                  </label>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                         placeholder={isZh ? '+86 13800000000' : '+1 555 123 4567'}
+                         className="w-full px-4 py-3 rounded-md text-[14px] border"
+                         style={{ background: 'var(--paper)', borderColor: 'var(--line)' }} />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--ink-mute)' }}>
+                  {isZh ? '密码' : 'Password'}
+                </label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                       placeholder={isZh ? '至少 6 位' : 'At least 6 characters'}
+                       className="w-full px-4 py-3 rounded-md text-[14px] border"
+                       style={{ background: 'var(--paper)', borderColor: 'var(--line)' }} />
+              </div>
+
+              {mode === 'signup' && (
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider mb-1.5" style={{ color: 'var(--ink-mute)' }}>
+                    {isZh ? '确认密码' : 'Confirm password'}
+                  </label>
+                  <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
+                         className="w-full px-4 py-3 rounded-md text-[14px] border"
+                         style={{ background: 'var(--paper)', borderColor: 'var(--line)' }} />
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 rounded-md text-[12px] flex items-start gap-2"
+                     style={{ background: '#FDF5F3', border: '1px solid #E8C8C0', color: 'var(--danger)' }}>
+                  <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={mode === 'signup' ? submitSignup : submitLogin}
+                disabled={submitting}
+                className="w-full px-5 py-3 rounded-md text-[13px] font-medium disabled:opacity-50"
+                style={{ background: 'var(--forest)', color: 'white' }}>
+                {submitting
+                  ? (isZh ? '处理中…' : 'Working…')
+                  : (mode === 'signup' ? (isZh ? '创建账号' : 'Create account') : (isZh ? '登录' : 'Log in'))}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// API Key modal — shown on first load after auth
+// ═══════════════════════════════════════════════════════════════
+function ApiKeyModal({ onSave, onClose, language, existing }) {
+  const isZh = language === 'zh';
+  const [key, setKey] = useState(existing || '');
+  const valid = key.startsWith('sk-ant-');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
+         style={{ background: 'rgba(26, 36, 32, 0.5)' }}>
+      <div className="max-w-lg w-full rounded-xl p-8 fade-in"
+           style={{ background: 'var(--paper)', boxShadow: '0 20px 60px rgba(15,61,46,0.2)' }}>
+        <div className="eyebrow mb-2">{isZh ? '连接 Anthropic API' : 'Connect your Anthropic API'}</div>
+        <h3 className="font-display text-[24px] mb-4" style={{ color: 'var(--forest)' }}>
+          {isZh ? '添加你的 API Key' : 'Add your API key'}
+        </h3>
+        <div className="text-[13px] leading-relaxed mb-5" style={{ color: 'var(--ink-soft)' }}>
+          {isZh
+            ? '这个演示版直接从你的浏览器调用 Anthropic API。你需要在 console.anthropic.com 创建一个 API key，并贴在下面。Key 只保存在你自己的浏览器本机，不会上传任何服务器。'
+            : 'This demo calls the Anthropic API directly from your browser. You need to create an API key at console.anthropic.com and paste it below. The key is stored only in your local browser — never uploaded anywhere.'}
+        </div>
+        <input type="password" value={key} onChange={e => setKey(e.target.value)}
+               placeholder="sk-ant-api03-..."
+               className="w-full px-4 py-3 rounded-md text-[13px] border font-mono mb-3"
+               style={{ background: 'var(--paper)', borderColor: valid ? 'var(--forest)' : 'var(--line)' }} />
+        <div className="text-[11px] mb-5" style={{ color: 'var(--ink-mute)' }}>
+          {isZh
+            ? <>在 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="underline" style={{ color: 'var(--forest)' }}>console.anthropic.com/settings/keys</a> 创建。使用你自己的配额。</>
+            : <>Create one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="underline" style={{ color: 'var(--forest)' }}>console.anthropic.com/settings/keys</a>. You will use your own quota.</>}
+        </div>
+        <div className="flex gap-2">
+          {existing && (
+            <button onClick={onClose}
+                    className="px-4 py-2.5 rounded-md text-[12px] border"
+                    style={{ borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
+              {isZh ? '取消' : 'Cancel'}
+            </button>
+          )}
+          <button onClick={() => { if (key) { localStorage.setItem('coach:apiKey', key); onSave(); } }}
+                  disabled={!key}
+                  className="flex-1 px-5 py-2.5 rounded-md text-[13px] font-medium disabled:opacity-50"
+                  style={{ background: 'var(--forest)', color: 'white' }}>
+            {isZh ? '保存并继续' : 'Save and continue'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Root router
+// ═══════════════════════════════════════════════════════════════
+function Root() {
+  const [language, setLanguage] = useState('en');
+  const [page, setPage] = useState('loading'); // 'loading' | 'landing' | 'auth' | 'app'
+
+  // Check Supabase session on mount
+  useEffect(() => {
+    const loader = document.getElementById('init-loader');
+
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        currentUserId = session.user.id;
+        dataCache = {};
+        // Load language preference
+        try {
+          const { data } = await supabase.from('user_data').select('settings').eq('user_id', currentUserId).single();
+          if (data?.settings?.language) setLanguage(data.settings.language);
+        } catch {}
+        setPage('app');
+      } else {
+        setPage('landing');
+      }
+      if (loader) loader.classList.remove('visible');
+    };
+
+    initSession();
+
+    // Listen for auth state changes (e.g. email confirmation redirect)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        currentUserId = session.user.id;
+        dataCache = {};
+        setPage('app');
+      } else if (event === 'SIGNED_OUT') {
+        currentUserId = null;
+        dataCache = {};
+        setPage('landing');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Expose globals for CoachApp sidebar
+  useEffect(() => {
+    window.__coachLogout = async () => {
+      await supabase.auth.signOut();
+      currentUserId = null;
+      dataCache = {};
+      setPage('landing');
+    };
+  }, []);
+
+  if (page === 'loading') return null; // init-loader spinner handles this
+  if (page === 'landing') {
+    return <LandingPage onStart={() => setPage('auth')} language={language} setLanguage={setLanguage} />;
+  }
+  if (page === 'auth') {
+    return <AuthPage onLogin={() => setPage('app')} onBack={() => setPage('landing')} language={language} />;
+  }
+  // page === 'app'
+  return (
+    <>
+      <CoachApp />
+      <button
+        onClick={() => window.__coachLogout && window.__coachLogout()}
+        title={language === 'zh' ? '退出登录' : 'Log out'}
+        className="fixed bottom-4 left-4 z-30 px-3 py-2 rounded-md text-[11px] font-medium border flex items-center gap-1.5 hover:bg-white"
+        style={{ background: 'rgba(255,255,255,0.9)', borderColor: 'var(--line)', color: 'var(--ink-soft)' }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        {language === 'zh' ? '退出' : 'Log out'}
+      </button>
+    </>
+  );
+}
+
+// Mount
+const rootEl = document.getElementById('root');
+const reactRoot = createRoot(rootEl);
+reactRoot.render(<Root />);
+  </script>
+</body>
+</html>
