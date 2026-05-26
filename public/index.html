@@ -110,10 +110,19 @@ const MODEL = 'claude-sonnet-4-20250514';
 const STORAGE_KEYS = {
   profile: 'coach:profile',
   conversations: 'coach:conversations',
+  conversation_summaries: 'coach:conversation_summaries',
+  module_outcomes: 'coach:module_outcomes',
   progress: 'coach:progress',
   rubric: 'coach:rubric',
   resumes: 'coach:resumes',
   settings: 'coach:settings',
+};
+
+// 滑动窗口配置
+const MEMORY_CONFIG = {
+  MAX_RECENT_MESSAGES: 10,       // 保留最近 N 条原文
+  COMPRESS_THRESHOLD: 15,        // 超过 N 条时触发压缩
+  COMPRESS_BATCH_SIZE: 5,        // 每次压缩最早的 N 条
 };
 
 const MODULES = [
@@ -440,17 +449,41 @@ const buildSystemPrompt = (module, state) => {
     profile, progress, activeResume,
     targetRole, targetCompany, interviewMode, questionNumber,
     resumeSubmode, language,
+    moduleOutcomes, conversationSummary,
   } = state;
 
+  // ── 第一层：用户 Profile
   const profileContext = profile
-    ? `STUDENT PROFILE (your persistent memory of this student):\n${JSON.stringify(profile, null, 2)}`
-    : 'STUDENT PROFILE: Not yet built.';
+    ? `用户档案（第一层·长期记忆）:\n${JSON.stringify(profile, null, 2)}`
+    : '用户档案: 尚未建立。';
 
-  const progressContext = `PROGRESS STATE: ${JSON.stringify(progress)}`;
+  // ── 第二层：模块成果
+  const outcomes = moduleOutcomes || {};
+  const outcomeParts = [];
+  if (outcomes.resume?.last_score || outcomes.resume?.key_suggestions?.length > 0) {
+    outcomeParts.push(`简历评估: 评分 ${JSON.stringify(outcomes.resume.last_score || '无')}, 主要建议: ${(outcomes.resume.key_suggestions || []).join('; ') || '无'}`);
+  }
+  if (outcomes.mock_interview?.total_sessions > 0) {
+    outcomeParts.push(`模拟面试: ${outcomes.mock_interview.total_sessions} 场, 最近评分 ${JSON.stringify(outcomes.mock_interview.latest_score || '无')}, 趋势 ${outcomes.mock_interview.trend || '无'}, 薄弱项: ${(outcomes.mock_interview.weak_areas || []).join(', ') || '无'}`);
+  }
+  const outcomesContext = outcomeParts.length > 0
+    ? `模块成果（第二层·结构化记忆）:\n${outcomeParts.join('\n')}`
+    : '';
 
-  const base = `You are an expert AI recruiting coach helping students land internships and full-time roles. You maintain a persistent memory of each student's profile across all sessions.
+  // ── 第三层：对话摘要
+  const summaryContext = conversationSummary
+    ? `历史对话摘要（第三层·压缩记忆）:\n${conversationSummary}`
+    : '';
+
+  const progressContext = `进度: ${JSON.stringify(progress)}`;
+
+  const base = `You are an expert AI recruiting coach helping students land internships and full-time roles. You have a three-layer memory system for each student.
 
 ${profileContext}
+
+${outcomesContext}
+
+${summaryContext}
 
 ${progressContext}
 
@@ -821,6 +854,103 @@ async function callClaude({ messages, system, expectJson = false, maxTokens = 25
   } catch (err) {
     return { raw: '', error: err.message };
   }
+}
+
+// ───────────────────────────────────────────────────────────────
+// 三层记忆：滑动窗口压缩 + 模块成果提取
+// ───────────────────────────────────────────────────────────────
+
+// 压缩旧消息到 summary（由 AI 总结）
+async function compressOldMessages(module, messages, existingSummary, language) {
+  const { MAX_RECENT_MESSAGES, COMPRESS_THRESHOLD, COMPRESS_BATCH_SIZE } = MEMORY_CONFIG;
+  if (messages.length < COMPRESS_THRESHOLD) return { messages, summary: existingSummary };
+
+  // 取最早的 COMPRESS_BATCH_SIZE 条做压缩
+  const toCompress = messages.slice(0, COMPRESS_BATCH_SIZE);
+  const remaining = messages.slice(COMPRESS_BATCH_SIZE);
+
+  const compressText = toCompress.map(m => `${m.role}: ${typeof m.content === 'string' ? m.content.slice(0, 300) : '[附件]'}`).join('\n');
+
+  const result = await callClaude({
+    system: `你是一个对话摘要助手。将下面的对话片段压缩成一段简洁的中文/英文摘要（和用户使用的语言一致），保留关键信息：用户提到的偏好、决定、重要事实、AI给出的建议。不超过 200 字。只输出摘要文本，不要任何其他内容。`,
+    messages: [{
+      role: 'user',
+      content: `已有历史摘要：${existingSummary || '无'}\n\n需要压缩的新对话：\n${compressText}`,
+    }],
+    maxTokens: 500,
+  });
+
+  const newSummary = result.raw || existingSummary;
+  return { messages: remaining, summary: newSummary };
+}
+
+// 从简历评审结果中提取结构化成果
+function extractResumeOutcome(aiResponse, existingOutcomes) {
+  const outcomes = { ...existingOutcomes };
+  const resume = { ...(outcomes.resume || {}) };
+
+  // 尝试从 AI 回复中提取评分和建议
+  const scoreMatch = aiResponse.match(/(\d+)\/100|overall[:\s]*(\d+)/i);
+  if (scoreMatch) {
+    resume.last_score = { overall: parseInt(scoreMatch[1] || scoreMatch[2]) };
+  }
+
+  // 提取关键建议（从 "Top 3 priority fixes" 或 "优先修改" 等段落）
+  const suggestions = [];
+  const lines = aiResponse.split('\n');
+  let inSuggestions = false;
+  for (const line of lines) {
+    if (/priority|优先|建议|修改|改进/i.test(line) && /\d/.test(line)) inSuggestions = true;
+    if (inSuggestions && /^[\s]*[-•\d]/.test(line)) {
+      const clean = line.replace(/^[\s]*[-•\d.]+\s*/, '').trim();
+      if (clean.length > 5 && clean.length < 200) suggestions.push(clean);
+    }
+    if (suggestions.length >= 5) break;
+  }
+  if (suggestions.length > 0) resume.key_suggestions = suggestions;
+  resume.updated_at = new Date().toISOString();
+  outcomes.resume = resume;
+  return outcomes;
+}
+
+// 从面试结果中提取结构化成果
+function extractInterviewOutcome(rubricHistory, existingOutcomes) {
+  const outcomes = { ...existingOutcomes };
+  const interview = { ...(outcomes.mock_interview || {}) };
+
+  interview.total_sessions = (interview.total_sessions || 0) + 1;
+
+  // 取最新一轮的平均分
+  if (rubricHistory.length > 0) {
+    const latest = rubricHistory[rubricHistory.length - 1];
+    if (latest.scores) {
+      interview.latest_score = latest.scores;
+    }
+  }
+
+  // 判断趋势
+  if (rubricHistory.length >= 2) {
+    const prev = rubricHistory[rubricHistory.length - 2];
+    const curr = rubricHistory[rubricHistory.length - 1];
+    const avgPrev = prev.scores ? Object.values(prev.scores).reduce((a, b) => a + b, 0) / Object.values(prev.scores).length : 0;
+    const avgCurr = curr.scores ? Object.values(curr.scores).reduce((a, b) => a + b, 0) / Object.values(curr.scores).length : 0;
+    interview.trend = avgCurr > avgPrev ? '上升' : avgCurr < avgPrev ? '下降' : '持平';
+  }
+
+  // 收集弱项（分数 <= 2 的维度）
+  const weakAreas = [];
+  if (rubricHistory.length > 0) {
+    const latest = rubricHistory[rubricHistory.length - 1];
+    if (latest.scores) {
+      for (const [dim, score] of Object.entries(latest.scores)) {
+        if (score <= 2) weakAreas.push(dim);
+      }
+    }
+  }
+  if (weakAreas.length > 0) interview.weak_areas = weakAreas;
+  interview.updated_at = new Date().toISOString();
+  outcomes.mock_interview = interview;
+  return outcomes;
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -1400,6 +1530,12 @@ function CoachApp() {
   const [conversations, setConversations] = useState({ onboarding: [], resume: [], interview: [] });
   const [progress, setProgress] = useState({ profile: false, resume: false, interview: false });
   const [rubricHistory, setRubricHistory] = useState([]);
+  const [moduleOutcomes, setModuleOutcomes] = useState({
+    resume: { latest_version: null, last_score: null, key_suggestions: [], updated_at: null },
+    mock_interview: { total_sessions: 0, latest_score: null, trend: null, weak_areas: [], updated_at: null },
+    question_bank: { completed_count: 0, accuracy_by_category: {}, weak_topics: [], updated_at: null },
+  });
+  const [conversationSummaries, setConversationSummaries] = useState({ onboarding: '', resume: '', interview: '' });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
@@ -1438,19 +1574,23 @@ function CoachApp() {
   // ── Load
   useEffect(() => {
     (async () => {
-      const [p, c, pr, rh, rs, settings] = await Promise.all([
+      const [p, c, pr, rh, rs, settings, mo, cs] = await Promise.all([
         loadStorage(STORAGE_KEYS.profile, null),
         loadStorage(STORAGE_KEYS.conversations, { onboarding: [], resume: [], interview: [] }),
         loadStorage(STORAGE_KEYS.progress, { profile: false, resume: false, interview: false }),
         loadStorage(STORAGE_KEYS.rubric, []),
         loadStorage(STORAGE_KEYS.resumes, []),
         loadStorage(STORAGE_KEYS.settings, {}),
+        loadStorage(STORAGE_KEYS.module_outcomes, null),
+        loadStorage(STORAGE_KEYS.conversation_summaries, { onboarding: '', resume: '', interview: '' }),
       ]);
       setProfile(p);
       setConversations(c);
       setProgress(pr);
       setRubricHistory(rh);
       setResumes(rs);
+      if (mo) setModuleOutcomes(mo);
+      setConversationSummaries(cs);
       if (settings.activeResumeId) setActiveResumeId(settings.activeResumeId);
       if (settings.targetRole) setTargetRole(settings.targetRole);
       if (settings.targetCompany) setTargetCompany(settings.targetCompany);
@@ -1475,6 +1615,8 @@ function CoachApp() {
   }, [conversations, storageReady]);
   useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.progress, progress); }, [progress, storageReady]);
   useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.rubric, rubricHistory); }, [rubricHistory, storageReady]);
+  useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.module_outcomes, moduleOutcomes); }, [moduleOutcomes, storageReady]);
+  useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.conversation_summaries, conversationSummaries); }, [conversationSummaries, storageReady]);
   useEffect(() => { if (storageReady) saveStorage(STORAGE_KEYS.resumes, resumes); }, [resumes, storageReady]);
   useEffect(() => {
     if (storageReady) saveStorage(STORAGE_KEYS.settings, {
@@ -1569,6 +1711,7 @@ function CoachApp() {
 
     const system = buildSystemPrompt('resume', {
       profile, progress, activeResume: r, resumeSubmode: 'review', language,
+      moduleOutcomes, conversationSummary: conversationSummaries.resume || '',
     });
     const result = await callClaude({
       messages: [{ role: 'user', content: 'Please review my resume.' }],
@@ -1582,7 +1725,10 @@ function CoachApp() {
     if (reviewed) text = text.replace(/\[RESUME_REVIEWED\]/g, '').trim();
 
     setConversations(prev => ({ ...prev, resume: [{ role: 'assistant', content: text }] }));
-    if (reviewed) setProgress(prev => ({ ...prev, resume: true }));
+    if (reviewed) {
+      setProgress(prev => ({ ...prev, resume: true }));
+      setModuleOutcomes(prev => extractResumeOutcome(text, prev));
+    }
   };
 
   // ── Start resume build
@@ -1596,6 +1742,7 @@ function CoachApp() {
 
     const system = buildSystemPrompt('resume', {
       profile, progress, activeResume: null, resumeSubmode: 'build', language,
+      moduleOutcomes, conversationSummary: conversationSummaries.resume || '',
     });
     const result = await callClaude({
       messages: [{ role: 'user', content: "I don't have a resume yet. Help me build one." }],
@@ -1680,10 +1827,15 @@ function CoachApp() {
       targetRole, targetCompany, interviewMode,
       questionNumber: currentModule === 'interview' ? questionNumber : 0,
       resumeSubmode, language,
+      moduleOutcomes,
+      conversationSummary: conversationSummaries[currentModule] || '',
     });
 
+    // 滑动窗口：只发送 summary + 最近 N 条给 API（不是全量）
+    const recentForApi = newMessages.slice(-MEMORY_CONFIG.MAX_RECENT_MESSAGES);
+
     // Convert messages for API — preserve multi-block content
-    const apiMessages = newMessages.map(m => {
+    const apiMessages = recentForApi.map(m => {
       if (m.isInterview && m.meta) {
         const parts = [];
         if (m.meta.feedback) parts.push(`[feedback]: ${m.meta.feedback}`);
@@ -1724,7 +1876,13 @@ function CoachApp() {
         interview: [...prev.interview, { role: 'assistant', content: '', meta, isInterview: true }],
       }));
 
-      if (done) setProgress(prev => ({ ...prev, interview: true }));
+      if (done) {
+        setProgress(prev => ({ ...prev, interview: true }));
+        // 第二层：提取面试结构化成果
+        setModuleOutcomes(prev => extractInterviewOutcome([...rubricHistory, {
+          timestamp: Date.now(), questionNumber, scores: rubric,
+        }], prev));
+      }
       else setQuestionNumber(prev => prev + 1);
     } else {
       let responseText = result.raw || (result.error ? `⚠️ ${result.error}` : '(No response)');
@@ -1801,8 +1959,30 @@ function CoachApp() {
       }
       if (resumeReviewed) {
         setProgress(prev => ({ ...prev, resume: true }));
+        // 第二层：提取简历评审的结构化成果
+        setModuleOutcomes(prev => extractResumeOutcome(responseText, prev));
       }
     }
+
+    // ── 第三层：滑动窗口压缩（异步，不阻塞 UI）
+    setTimeout(async () => {
+      const updatedMsgs = conversations[currentModule] ? [...conversations[currentModule]] : [];
+      // 加上刚才的用户消息和AI回复后，估算最新数量
+      const latestCount = updatedMsgs.length + 2; // +2 for user msg + assistant reply just added
+      if (latestCount >= MEMORY_CONFIG.COMPRESS_THRESHOLD) {
+        const currentSummary = conversationSummaries[currentModule] || '';
+        // 重新读取最新 conversations（因为 setState 是异步的）
+        const freshConvos = await loadStorage(STORAGE_KEYS.conversations, conversations);
+        const freshMsgs = freshConvos[currentModule] || [];
+        if (freshMsgs.length >= MEMORY_CONFIG.COMPRESS_THRESHOLD) {
+          const { messages: compressedMsgs, summary: newSummary } = await compressOldMessages(
+            currentModule, freshMsgs, currentSummary, language
+          );
+          setConversations(prev => ({ ...prev, [currentModule]: compressedMsgs }));
+          setConversationSummaries(prev => ({ ...prev, [currentModule]: newSummary }));
+        }
+      }
+    }, 2000);
   };
 
   // ── Save edited resume (text or structured)
